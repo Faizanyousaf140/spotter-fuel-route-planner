@@ -43,8 +43,82 @@ is committed.
 request ──► resolve start/finish (offline gazetteer; fallback geocoder only if needed)
         ──► 1 routing call (OSRM), cached by start/finish
         ──► match stations to the route geometry (in memory, numpy)
-        ──► fuel optimisation  ──► JSON + map              (TODO: stages 3–4)
+        ──► exact minimum-cost fuel plan (dynamic programme, in memory)
+        ──► JSON + map                                      (TODO: stage 4)
 ```
+
+## Fuel-stop optimisation
+
+`route_api/services/fuel_optimizer.py`. It makes no external calls and uses
+only the candidate stations from matching.
+
+**Model.**
+* Fuel is counted in miles of range. Capacity U = 500, and the tank starts full.
+* Stops are visited in increasing (mile marker, off-route) order. Stations
+  whose nearest route point is the same are visited nearest-to-the-route first.
+* A leg between consecutive stops i → j uses
+  `off_i + (mile_j − mile_i) + off_j` miles of fuel. The start and the
+  destination have off = 0, and the off values are estimates.
+* Fuel can never be below 0 or above U, and any amount can be bought.
+* The plan minimises money spent at stops, which also minimises the total cost
+  (see the fuel model above).
+
+**Algorithm.** This is an exact dynamic programme based on Khuller, Malekian &
+Mestre, *"To fill or not to fill: the gas station problem"* (ACM TALG, 2011).
+Some optimal plan has this form at every stop u with next stop v:
+* if v is cheaper or the same price (or v is the destination), buy just enough
+  to reach v;
+* if v costs more, fill the tank.
+
+So the fuel on arrival only ever takes a small set of values. The value function
+`C(u, g)` = cheapest way to finish after arriving at u with g miles of fuel:
+
+```
+C(u,g) = min( −g·p_u + min_{v cheaper/equal, d(u,v) ≥ g} [ d(u,v)·p_u + C(v,0) ],
+              (U−g)·p_u + min_{v pricier, d(u,v) ≤ U} C(v, U − d(u,v)) )
+```
+
+It is computed backwards along the route. Suffix minima let each `C(u,·)` be
+evaluated in O(log k). The answer is the cheapest first stop reachable on the
+starting fuel, or no stop if the starting fuel already covers the trip.
+
+* **Complexity:** O(n·k·log k) time and O(n·k) memory, where n is the number
+  of candidate stations (after removing stations that share an identical
+  position, keeping the cheapest) and k is the number of stations within range
+  of a station.
+* **Tie clean-up:** a stop where nothing is bought (possible only through ties)
+  is removed and the fuel ledger is re-simulated.
+* **No plan possible:** the API returns 422 and names the gap, e.g.
+  *"no usable fuel station between mile 400.0 and mile 950.0"*.
+
+**Verification (tests/test_fuel_optimizer.py).**
+* Hand-calculated cases:
+  * a trip under 500 miles;
+  * exactly 500 miles;
+  * 500.5 miles;
+  * a cheaper station ahead;
+  * no cheaper station ahead;
+  * a cheaper but distant station;
+  * an expensive detour against a small detour;
+  * identical mile markers;
+  * a 5-stop route;
+  * gaps over 500 miles;
+  * a destination that can't be reached;
+  * not enough starting fuel.
+* An **independent exhaustive solver** that tries every subset of stations, in
+  any order allowed by the model, and every whole-number purchase. With integer
+  distances, an optimal plan with whole-number purchases always exists (the
+  constraints form a totally unimodular system), so the brute force finds the
+  true optimum. The DP matched it on **600 random cases in the suite** (282
+  feasible) and on **5,000 more in a one-off sweep** (1,647 feasible), with
+  0 mismatches. The sweep first exposed a tie-ordering bug, which was fixed and
+  is now a regression test.
+* Every plan's fuel ledger is checked: never below 0, never above capacity,
+  and purchases minus fuel burned equal fuel left at the end.
+
+Under this model, and within these tests, the optimiser returns the minimum
+refuelling cost. Real-road optimality also depends on the estimated detours
+and city-level station positions (see limitations).
 
 ## Fuel model and assumptions
 

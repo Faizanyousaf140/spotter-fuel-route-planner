@@ -4,8 +4,10 @@ Match fuel stations to the actual route geometry.
 1. Route profile: cumulative driving distance along the full-resolution route
    geometry, scaled so the total equals the provider's route distance, then
    resampled to one point every ``spacing`` miles (default 2).
-2. Rough filter: stations inside the route's bounding box expanded by the
-   corridor width (cheap vectorised comparison).
+2. Rough filters: (a) the route's bounding box expanded by the corridor;
+   (b) a grid whose cells are at least (corridor + sample spacing) wide: only
+   stations in a cell next to a cell containing a route sample can be within
+   the corridor. Both are exact pre-filters (no in-corridor station is lost).
 3. Nearest route sample for each remaining station (vectorised, chunked).
 4. Refinement: project the station onto the two route segments adjacent to
    that sample to get its perpendicular distance from the route
@@ -37,6 +39,10 @@ class RouteProfile:
     miles: np.ndarray       # cumulative driving miles at each resampled point
     total_miles: float
     geometry_miles: float   # length of the provider geometry (before scaling)
+
+    @property
+    def spacing(self) -> float:
+        return float(self.miles[1] - self.miles[0]) if len(self.miles) > 1 else 0.0
 
     @property
     def scale(self) -> float:
@@ -97,6 +103,9 @@ def match_stations(profile: RouteProfile, index: StationIndex, corridor_miles: f
     candidates = np.flatnonzero(in_box)
     if candidates.size == 0:
         return []
+    candidates = _grid_prefilter(candidates, index, profile, corridor_miles, max_abs_lat)
+    if candidates.size == 0:
+        return []
 
     # 2. nearest resampled route point (equirectangular distance, chunked)
     s_lat, s_lon = profile.lats, profile.lons
@@ -121,6 +130,24 @@ def match_stations(profile: RouteProfile, index: StationIndex, corridor_miles: f
     ]
     results.sort(key=lambda c: (c.mile_marker, c.price, c.station.opis_id))
     return results
+
+
+def _grid_prefilter(candidates, index, profile: RouteProfile, corridor_miles: float, max_abs_lat: float):
+    """Keep stations whose grid cell touches a cell containing a route sample."""
+    reach = corridor_miles + profile.spacing + 1e-6  # station -> nearest sample is at most this far
+    cell_lat = reach / MILES_PER_DEG_LAT
+    cell_lon = reach / (MILES_PER_DEG_LAT * math.cos(math.radians(max_abs_lat)))
+
+    def keys(lats, lons):
+        return np.floor(lats / cell_lat).astype(np.int64) * 1_000_003 + np.floor(lons / cell_lon).astype(np.int64)
+
+    sample_lat_idx = np.floor(profile.lats / cell_lat).astype(np.int64)
+    sample_lon_idx = np.floor(profile.lons / cell_lon).astype(np.int64)
+    dilated = np.unique(np.concatenate([
+        (sample_lat_idx + dy) * 1_000_003 + (sample_lon_idx + dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1)
+    ]))
+    mask = np.isin(keys(index.lats[candidates], index.lons[candidates]), dilated)
+    return candidates[mask]
 
 
 def _project_to_adjacent_segments(st_lat, st_lon, nearest, profile: RouteProfile):
