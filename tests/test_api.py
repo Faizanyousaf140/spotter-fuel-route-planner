@@ -151,6 +151,9 @@ class SuccessfulPlanTests(RouteApiTestCase):
         self.assertIn("MIDDLE STOP", html)
         self.assertIn('id="plan-data"', html)
         self.assertIn("OpenStreetMap contributors", html)
+        # OSM tile policy: the page must not strip the Referer from tile requests (403 otherwise).
+        self.assertEqual(r.headers["Referrer-Policy"], "strict-origin-when-cross-origin")
+        self.assertIn('referrerPolicy: "strict-origin-when-cross-origin"', html)
 
     def test_unknown_plan_ids(self):
         self.assertEqual(self.client.get(reverse("route-plan-map", args=[uuid4()])).status_code, 404)

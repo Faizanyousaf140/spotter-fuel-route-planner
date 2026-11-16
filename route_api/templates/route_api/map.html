@@ -88,7 +88,10 @@
   const line = L.geoJSON(data.route.geometry, { style: { color: "#8250df", weight: 4, opacity: 0.85 } });
   map.fitBounds(line.getBounds(), { padding: [24, 24] });   // the map needs a view before vector layers are added
   let tileErrors = 0;
-  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" })
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19, attribution: "&copy; OpenStreetMap contributors",
+      referrerPolicy: "strict-origin-when-cross-origin",   // OSM tile policy: tile requests need a Referer
+    })
     .on("tileerror", () => { if (++tileErrors === 3) notice("Some map tiles failed to load; the route and stops are still shown."); })
     .addTo(map);
   line.addTo(map);

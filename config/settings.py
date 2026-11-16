@@ -143,6 +143,10 @@ REST_FRAMEWORK = {
 }
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
+# OpenStreetMap's tile policy requires a Referer on tile requests from web pages; Django's
+# default "same-origin" strips it (tiles answer 403 "Access blocked"). This sends only the
+# origin (e.g. "http://127.0.0.1:8000/") to other sites, never full URLs.
+SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
 # HTTPS hardening: enable when served over HTTPS (off by default for local HTTP use).
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
