@@ -43,9 +43,16 @@
     .tbtn svg { width: 15px; height: 15px; }
 
     /* ---------- shell ---------- */
-    .shell { height: calc(100vh - var(--header-h)); display: grid; grid-template-columns: var(--panel-w) 1fr; transition: grid-template-columns .25s ease; }
-    body.map-expanded .shell { grid-template-columns: 0 1fr; }
-    body.map-expanded .panel { visibility: hidden; }
+    .shell { height: calc(100vh - var(--header-h)); display: grid; grid-template-columns: var(--panel-w) 8px 1fr; transition: grid-template-columns .25s ease; }
+    body.resizing .shell { transition: none; }
+    body.resizing, body.resizing * { cursor: col-resize !important; user-select: none; }
+    body.map-expanded .shell { grid-template-columns: 0 0 1fr; }
+    body.map-expanded .panel, body.map-expanded .resizer { visibility: hidden; }
+    .resizer { position: relative; z-index: 900; cursor: col-resize; touch-action: none; background: var(--bg); border-left: 1px solid var(--line); border-right: 1px solid var(--line); }
+    .resizer::before { content: ""; position: absolute; top: 50%; left: 50%; width: 4px; height: 36px; translate: -50% -50%; border-radius: 4px;
+                       background: radial-gradient(circle, var(--slate-2) 1.2px, transparent 1.6px) 0 0 / 4px 6px; opacity: .9; }
+    .resizer:hover, .resizer:focus-visible, body.resizing .resizer { background: var(--blue-soft); border-color: #BFDBFE; }
+    .resizer:hover::before, body.resizing .resizer::before { background-image: radial-gradient(circle, var(--blue) 1.2px, transparent 1.6px); }
     .panel { overflow-y: auto; border-right: 1px solid var(--line); background: var(--bg); scroll-behavior: smooth; }
     .panel-inner { padding: 16px; display: grid; gap: 14px; }
     .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
@@ -203,6 +210,7 @@
       .crumb { padding-left: 10px; }
       .shell { display: block; height: calc(100dvh - var(--header-h) - 58px); position: relative; }
       .panel, .mapwrap { position: absolute; inset: 0; }
+      .resizer { display: none; }
       .panel { border-right: 0; }
       body[data-view="list"] .mapwrap { visibility: hidden; }
       body[data-view="map"] .panel { visibility: hidden; }
@@ -327,6 +335,9 @@
       </section>
     </div>
   </aside>
+
+  <div class="resizer" id="resizer" role="separator" aria-orientation="vertical" tabindex="0"
+       aria-label="Resize trip panel (drag, or use the arrow keys; double-click to reset)" title="Drag to resize · double-click to reset"></div>
 
   <section class="mapwrap" aria-label="Route map">
     <div id="map"></div>
@@ -672,6 +683,40 @@
   });
 
   window.addEventListener("resize", () => { if (map) map.invalidateSize(); });
+
+  // ------------------------------------------------------------------ panel resizer
+  (function () {
+    const handle = $("resizer"), root = document.documentElement, KEY = "fuelroute.panelWidth";
+    const clamp = (w) => Math.round(Math.min(Math.max(w, 320), window.innerWidth * 0.7));
+    let frame = 0;
+    const apply = (w, save) => {
+      root.style.setProperty("--panel-w", `${clamp(w)}px`);
+      handle.setAttribute("aria-valuenow", String(clamp(w)));
+      if (map && !frame) frame = requestAnimationFrame(() => { frame = 0; map.invalidateSize(); });
+      if (save) try { localStorage.setItem(KEY, String(clamp(w))); } catch (e) { /* private mode */ }
+    };
+    try { const saved = Number(localStorage.getItem(KEY)); if (saved) apply(saved, false); } catch (e) { /* ignore */ }
+    handle.addEventListener("pointerdown", (e) => {
+      e.preventDefault(); handle.setPointerCapture(e.pointerId); document.body.classList.add("resizing");
+      const left = $("panel").getBoundingClientRect().left;
+      const move = (ev) => apply(ev.clientX - left, false);
+      const up = (ev) => {
+        handle.removeEventListener("pointermove", move); handle.removeEventListener("pointerup", up);
+        document.body.classList.remove("resizing"); apply(ev.clientX - left, true);
+      };
+      handle.addEventListener("pointermove", move); handle.addEventListener("pointerup", up);
+    });
+    handle.addEventListener("keydown", (e) => {
+      if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+      e.preventDefault();
+      apply($("panel").getBoundingClientRect().width + (e.key === "ArrowRight" ? 32 : -32), true);
+    });
+    handle.addEventListener("dblclick", () => {
+      root.style.removeProperty("--panel-w");
+      try { localStorage.removeItem(KEY); } catch (e) { /* ignore */ }
+      if (map) setTimeout(() => map.invalidateSize(), 0);
+    });
+  })();
 
   // ------------------------------------------------------------------ initial state
   const initial = $("plan-data");
