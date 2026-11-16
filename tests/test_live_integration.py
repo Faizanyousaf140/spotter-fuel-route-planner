@@ -50,6 +50,8 @@ class LiveOSRMTests(SimpleTestCase):
         self.assertGreater(route.distance_miles, 250)   # ~300 road miles
         self.assertLess(route.distance_miles, 350)
         self.assertGreater(len(route.coordinates), 100)
+        refs = set().union(*(seg.refs for seg in route.road_segments))
+        self.assertIn("I55", refs)  # polyline6 + steps parsing against the real provider
 
         profile = build_route_profile(route.coordinates, route.distance_miles)
         self.assertAlmostEqual(profile.scale, 1.0, delta=0.01)  # geometry length ~= reported distance
@@ -101,6 +103,7 @@ class LiveEndToEndApiTests(TestCase):
         self.assertAlmostEqual(cost["total_fuel_cost"], cost["starting_fuel_estimate"]["estimated_value_of_fuel_used"]
                                + cost["purchased_during_trip"]["cost"], places=1)
         self.assertEqual(self.client.get(f"/api/v1/route/{b['plan_id']}/map/").status_code, 200)
+        self.assertGreater(b["data_quality"]["location_confidence"]["high"], 0)
 
         second = self.client.post("/api/v1/route/", body, content_type="application/json").json()
         self.assertEqual(second["meta"]["map_api_calls"]["routing"], 0)

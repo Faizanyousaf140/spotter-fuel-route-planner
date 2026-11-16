@@ -2,7 +2,7 @@
 
 from django.test import SimpleTestCase
 
-from route_api.services.cost_calculator import choose_start_price, render_stop, summarize
+from route_api.services.cost_calculator import choose_start_price, summarize
 from route_api.services.fuel_optimizer import FuelCandidate, optimize_fuel_plan
 from route_api.services.route_matching import CorridorStation
 
@@ -73,11 +73,62 @@ class SummaryTests(SimpleTestCase):
     def test_rendered_stop_fields_and_rounding(self):
         stations = [corridor(1, 250, 3.00733333, name="WOODSHED")]
         p = plan(stations, 500.5)
-        row = render_stop(1, p.stops[0])
+        row = summarize(p, choose_start_price(stations, 3.5))["stops"][0]
         self.assertEqual(row["gallons_purchased"], 0.05)
-        self.assertEqual(row["price_per_gallon"], 3.007)
-        self.assertEqual(row["cost"], 0.15)
+        self.assertEqual(row["price_per_gallon"], 3.00733)   # stored 5-decimal precision
+        self.assertEqual(row["cost"], 0.15)                  # 0.05 gal x $3.00733 = $0.1504 -> $0.15
         self.assertEqual(row["location"]["precision"], "city-level (approximate)")
         for key in ("mile_marker", "distance_from_route_miles", "estimated_detour_miles", "fuel_on_arrival_gallons",
                     "fuel_on_departure_gallons", "decision", "reason"):
             self.assertIn(key, row)
+
+
+class DisplayedLedgerPropertyTests(SimpleTestCase):
+    """Property test: every number in the rendered plan can be re-added by hand, exactly."""
+
+    def test_random_plans_are_self_consistent(self):
+        import random
+        from decimal import ROUND_HALF_UP, Decimal
+
+        rng = random.Random(42)
+        checked = 0
+        for _ in range(300):
+            route = rng.uniform(50, 3000)
+            stations = [corridor(k, rng.uniform(0, route), round(rng.uniform(2.6, 4.6), rng.choice([3, 5, 8])),
+                                 off=rng.choice([0.0, rng.uniform(0, 15)])) for k in range(rng.randint(0, 60))]
+            try:
+                p = plan(stations, route)
+            except Exception:  # infeasible random instance
+                continue
+            s = summarize(p, choose_start_price(stations, 3.4))
+            t, sf = s["totals"], s["starting_fuel"]
+            stops = s["stops"]
+            cents = lambda x: Decimal(repr(x))  # noqa: E731
+            self.assertEqual(sum(cents(x["cost"]) for x in stops), cents(t["refueling_cost"]))
+            self.assertAlmostEqual(sum(x["gallons_purchased"] for x in stops), t["gallons_purchased"], places=9)
+            self.assertEqual(cents(sf["estimated_value_of_fuel_used"]) + cents(t["refueling_cost"]),
+                             cents(t["total_fuel_cost"]))
+            prev_departure = sf["gallons_in_tank_at_start"]
+            for x in stops:
+                self.assertAlmostEqual(prev_departure - x["leg_from_previous"]["fuel_used_gallons"],
+                                       x["fuel_on_arrival_gallons"], places=9)
+                self.assertAlmostEqual(x["fuel_on_arrival_gallons"] + x["gallons_purchased"],
+                                       x["fuel_on_departure_gallons"], places=9)
+                self.assertGreaterEqual(x["fuel_on_arrival_gallons"], 0.0)
+                self.assertLessEqual(x["fuel_on_departure_gallons"], 50.0)
+                self.assertLessEqual(x["leg_from_previous"]["miles"], 500.0 + 1e-6)
+                # fuel used on a leg matches its miles at 10 mpg (within display rounding)
+                self.assertAlmostEqual(x["leg_from_previous"]["fuel_used_gallons"],
+                                       x["leg_from_previous"]["miles"] / 10, delta=0.0015)
+                expected = (Decimal(repr(x["gallons_purchased"])) * Decimal(repr(x["price_per_gallon"]))
+                            ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+                self.assertEqual(cents(x["cost"]), expected)
+                prev_departure = x["fuel_on_departure_gallons"]
+            self.assertAlmostEqual(prev_departure - t["final_leg"]["fuel_used_gallons"],
+                                   t["fuel_remaining_at_destination_gallons"], places=9)
+            self.assertAlmostEqual(sf["gallons_in_tank_at_start"] + t["gallons_purchased"]
+                                   - t["fuel_remaining_at_destination_gallons"], t["fuel_burned_gallons"], places=9)
+            self.assertLessEqual(t["longest_leg_miles"], 500.0 + 1e-6)
+            self.assertAlmostEqual(t["fuel_burned_gallons"], t["total_miles_driven"] / 10, delta=0.001 * (2 * len(stops) + 2))
+            checked += 1
+        self.assertGreater(checked, 150)

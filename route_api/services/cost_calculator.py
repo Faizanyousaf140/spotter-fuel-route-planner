@@ -7,12 +7,20 @@ Kept deliberately separate:
   * refuelling     - money actually spent at the planned stops.
 Total estimated fuel cost = starting fuel burned x start price + refuelling spend.
 
-All arithmetic is unrounded; values are rounded only when rendered.
+Rounding policy (so that every published number can be re-added by hand):
+  * the optimiser works unrounded;
+  * displayed fuel levels are the exact levels rounded to 0.001 gal at each
+    node; gallons bought = departure - arrival and fuel used on a leg =
+    previous departure - next arrival, so the displayed ledger balances exactly;
+  * money is rounded per purchase, like a pump receipt:
+    cost = gallons shown x price (stored 5-decimal precision), to the cent;
+    totals are sums of the displayed parts.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import ROUND_HALF_UP, Decimal
 
 from .fuel_optimizer import (
     DECISION_FILL_UP, DECISION_REACH_CHEAPER, DECISION_REACH_DESTINATION, DECISION_REACH_EQUAL,
@@ -58,69 +66,114 @@ def stop_reason(stop: PlannedStop) -> str:
     return stop.decision  # pragma: no cover
 
 
-def render_stop(index: int, stop: PlannedStop) -> dict:
-    cs: CorridorStation = stop.candidate.key
-    s = cs.station
-    return {
-        "sequence": index,
-        "opis_id": s.opis_id,
-        "name": s.name,
-        "address": s.address,
-        "city": s.city,
-        "state": s.state,
-        "location": {"lat": round(s.latitude, 6), "lon": round(s.longitude, 6),
-                     "precision": "city-level (approximate)"},
-        "price_per_gallon": round(s.price, 3),
-        "mile_marker": round(cs.mile_marker, 1),
-        "distance_from_route_miles": round(cs.off_route_miles, 1),
-        "estimated_detour_miles": round(stop.detour_miles, 1),
-        "fuel_on_arrival_gallons": round(stop.arrival_gallons, 2),
-        "gallons_purchased": round(stop.purchase_gallons, 3),
-        "fuel_on_departure_gallons": round(stop.departure_gallons, 2),
-        "cost": round(stop.cost, 2),
-        "decision": stop.decision,
-        "reason": stop_reason(stop),
-    }
+GAL_DP = 3       # gallons shown to 0.001 (like a pump)
+PRICE_DP = 5     # prices kept at the stored precision (averages of OPIS prices)
 
 
-def summarize(plan: FuelPlan, start: StartFuelValuation) -> dict:
-    mpg = plan.mpg
-    start_gallons = plan.start_fuel_miles / mpg
-    burned_gallons = plan.burned_miles / mpg
-    # Starting fuel is burned first; any fuel left at the destination is reported, not credited.
-    start_used_gallons = min(plan.start_fuel_miles, plan.burned_miles) / mpg
-    start_used_value = start_used_gallons * start.price
-    refuel_gallons = plan.purchased_miles / mpg
-    refuel_cost = plan.purchase_cost
-    total = start_used_value + refuel_cost
+def _gal(miles: float, mpg: float) -> float:
+    return round(max(miles, 0.0) / mpg, GAL_DP)
+
+
+CENT = Decimal("0.01")
+
+
+def _cents(gallons: float, price: float) -> Decimal:
+    """gallons x price rounded half-up to the cent, in exact decimal arithmetic."""
+    return (Decimal(repr(gallons)) * Decimal(repr(price))).quantize(CENT, rounding=ROUND_HALF_UP)
+
+
+def summarize(plan: FuelPlan, start: StartFuelValuation, confidence: dict | None = None) -> dict:
+    """Render the plan as consistent, hand-checkable numbers (see module docstring)."""
+    mpg, cap = plan.mpg, plan.range_miles / plan.mpg
+    confidence = confidence or {}
+    stops_out: list[dict] = []
+    trip_cost = Decimal("0")
+    trip_gallons = 0.0
+    prev_departure = round(plan.start_fuel_miles / mpg, GAL_DP)
+    prev_mile, prev_off = 0.0, 0.0
+    max_leg = 0.0
+    for index, stop in enumerate(plan.stops, start=1):
+        cs: CorridorStation = stop.candidate.key
+        s = cs.station
+        leg_miles = prev_off + (stop.candidate.mile - prev_mile) + stop.candidate.off_route
+        max_leg = max(max_leg, leg_miles)
+        arrival = _gal(stop.arrival_fuel_miles, mpg)
+        departure = min(_gal(stop.departure_fuel_miles, mpg), round(cap, GAL_DP))
+        bought = round(departure - arrival, GAL_DP)
+        price = round(s.price, PRICE_DP)
+        cost = _cents(bought, price)
+        trip_cost += cost
+        trip_gallons += bought
+        conf = confidence.get(s.opis_id)
+        stops_out.append({
+            "sequence": index,
+            "opis_id": s.opis_id,
+            "name": s.name,
+            "address": s.address,
+            "city": s.city,
+            "state": s.state,
+            "location": {
+                "lat": round(s.latitude, 6), "lon": round(s.longitude, 6),
+                "precision": "city-level (approximate)",
+                "confidence": conf.level if conf else None,
+                "matched_route_highways": list(conf.matched_highways) if conf else [],
+                "confidence_reason": conf.reason if conf else None,
+            },
+            "price_per_gallon": price,
+            "mile_marker": round(cs.mile_marker, 2),
+            "distance_from_route_miles": round(cs.off_route_miles, 2),
+            "estimated_detour_miles": round(stop.detour_miles, 2),
+            "leg_from_previous": {"miles": round(leg_miles, 2),
+                                  "fuel_used_gallons": round(prev_departure - arrival, GAL_DP)},
+            "fuel_on_arrival_gallons": arrival,
+            "gallons_purchased": bought,
+            "fuel_on_departure_gallons": departure,
+            "cost": float(cost),
+            "decision": stop.decision,
+            "reason": stop_reason(stop),
+        })
+        prev_departure, prev_mile, prev_off = departure, stop.candidate.mile, stop.candidate.off_route
+
+    final_leg_miles = prev_off + (plan.route_miles - prev_mile)
+    max_leg = max(max_leg, final_leg_miles)
+    remaining = _gal(plan.end_fuel_miles, mpg)
+    trip_gallons = round(trip_gallons, GAL_DP)
+    start_gallons = round(plan.start_fuel_miles / mpg, GAL_DP)
+    # Displayed ledger: burned = start + bought - remaining (exact in the shown decimals).
+    burned = round(start_gallons + trip_gallons - remaining, GAL_DP)
+    start_used = round(min(start_gallons, burned), GAL_DP)  # starting fuel is burned first
+    start_value = _cents(start_used, round(start.price, PRICE_DP))
 
     starting_fuel = {
-        "gallons_in_tank_at_start": round(start_gallons, 3),
-        "gallons_used": round(start_used_gallons, 3),
-        "price_per_gallon": round(start.price, 3),
+        "gallons_in_tank_at_start": start_gallons,
+        "gallons_used": start_used,
+        "price_per_gallon": round(start.price, PRICE_DP),
         "valuation_method": start.method,
-        "estimated_value_of_fuel_used": round(start_used_value, 2),
+        "estimated_value_of_fuel_used": float(start_value),
     }
     if start.station is not None:
-        s = start.station.station
+        st = start.station.station
         starting_fuel["valued_at_station"] = {
-            "opis_id": s.opis_id, "name": s.name, "city": s.city, "state": s.state,
-            "mile_marker": round(start.station.mile_marker, 1),
-            "distance_from_route_miles": round(start.station.off_route_miles, 1),
+            "opis_id": st.opis_id, "name": st.name, "city": st.city, "state": st.state,
+            "mile_marker": round(start.station.mile_marker, 2),
+            "distance_from_route_miles": round(start.station.off_route_miles, 2),
         }
     return {
-        "stops": [render_stop(i, stop) for i, stop in enumerate(plan.stops, start=1)],
+        "stops": stops_out,
         "starting_fuel": starting_fuel,
         "totals": {
-            "route_distance_miles": round(plan.route_miles, 1),
-            "estimated_detour_miles": round(plan.detour_miles, 1),
-            "total_miles_driven": round(plan.burned_miles, 1),
-            "fuel_burned_gallons": round(burned_gallons, 3),
+            "route_distance_miles": round(plan.route_miles, 2),
+            "estimated_detour_miles": round(plan.detour_miles, 2),
+            "total_miles_driven": round(plan.burned_miles, 2),
+            "fuel_burned_gallons": burned,
             "number_of_stops": len(plan.stops),
-            "gallons_purchased": round(refuel_gallons, 3),
-            "refueling_cost": round(refuel_cost, 2),
-            "starting_fuel_cost_estimate": round(start_used_value, 2),
-            "total_fuel_cost": round(total, 2),
-            "fuel_remaining_at_destination_gallons": round(plan.end_fuel_miles / mpg, 3),
+            "gallons_purchased": trip_gallons,
+            "refueling_cost": float(trip_cost),
+            "starting_fuel_cost_estimate": float(start_value),
+            "total_fuel_cost": float(start_value + trip_cost),
+            "fuel_remaining_at_destination_gallons": remaining,
+            "final_leg": {"miles": round(final_leg_miles, 2),
+                          "fuel_used_gallons": round(prev_departure - remaining, GAL_DP)},
+            "longest_leg_miles": round(max_leg, 2),
         },
     }

@@ -44,3 +44,7 @@ class RouteRequestSerializer(serializers.Serializer):
         required=False, min_value=1, max_value=50,
         help_text="Max straight-line miles between a station's (city-level) point and the route. Default 15.",
     )
+    min_location_confidence = serializers.ChoiceField(
+        choices=["low", "medium", "high"], required=False, default="low",
+        help_text='Only use stations at least this confident. "high" = the address highway is on the route.',
+    )

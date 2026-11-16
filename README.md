@@ -12,6 +12,8 @@ Prices come from the supplied OPIS file (`fuel-prices-for-be-assessment.csv`).
 * **Routing:** the free OSRM demo server, with **one call per new route** and **zero on a cached route**.
 * **Station locations:** found once, offline, from US Census data. No geocoding happens at request time.
 * **Fuel stops:** chosen by an exact minimum-cost dynamic programme. It is checked against an independent exhaustive solver.
+* **Location confidence:** every stop is rated by checking whether the highway in its address is one the route uses near that point.
+* **Self-consistent numbers:** every number in the response can be added up by hand and checks out exactly. This is enforced by a property test.
 
 ## Contents
 1. [Quick start](#quick-start)
@@ -28,6 +30,7 @@ Prices come from the supplied OPIS file (`fuel-prices-for-be-assessment.csv`).
 12. [Known limitations](#known-limitations)
 13. [Demo: Loom walkthrough script](#demo-loom-walkthrough-script)
 14. [Project layout](#project-layout)
+15. [Quality audit (v1.1)](#quality-audit-v11)
 
 ---
 
@@ -82,6 +85,9 @@ POST /api/v1/route/
   * free text, which falls back to the Nominatim geocoder (cached).
 * `corridor_miles` (optional, 1–50, default 15): the furthest a station's
   city-level point may be from the route.
+* `min_location_confidence` (optional: `low` (default), `medium` or `high`):
+  use only stations at least this confident. With `high`, every stop's address
+  highway is one the route uses near that point.
 
 ```bash
 curl -X POST http://127.0.0.1:8000/api/v1/route/ -H "Content-Type: application/json" \
@@ -94,52 +100,59 @@ This is a real response, trimmed: the geometry is shortened and 2 of the 3 stops
 
 ```jsonc
 {
-  "plan_id": "19563f0f-…",
-  "map_url": "http://127.0.0.1:8000/api/v1/route/19563f0f-…/map/",
-  "plan_url": "http://127.0.0.1:8000/api/v1/route/19563f0f-…/",
+  "plan_id": "…", "map_url": "http://127.0.0.1:8000/api/v1/route/…/map/", "plan_url": "http://127.0.0.1:8000/api/v1/route/…/",
   "start":  { "query": "Chicago, IL", "label": "Chicago, IL", "lat": 41.837045, "lon": -87.684939, "resolved_by": "census_gazetteer" },
   "finish": { "query": "Dallas, TX",  "label": "Dallas, TX",  "lat": 32.793333, "lon": -96.766513, "resolved_by": "census_gazetteer" },
-  "route": {
-    "provider": "osrm", "distance_miles": 961.5, "duration_hours": 17.04,
-    "geometry": { "type": "LineString", "coordinates": [[-87.68488, 41.83705], [-87.68116, 41.6918], "…"] },
-    "geometry_points_returned": 596, "geometry_points_from_provider": 9539
-  },
+  "route": { "provider": "osrm", "distance_miles": 961.47, "duration_hours": 17.04,
+             "geometry": { "type": "LineString", "coordinates": [[-87.68488, 41.83705], "…"] },
+             "geometry_points_returned": 596, "geometry_points_from_provider": 9539 },
   "fuel_stops": [
     {
       "sequence": 1, "opis_id": 67427, "name": "CASEYS #2907", "address": "I-57 & I-62", "city": "Charleston", "state": "MO",
-      "location": { "lat": 36.916934, "lon": -89.333912, "precision": "city-level (approximate)" },
-      "price_per_gallon": 3.044, "mile_marker": 376.5,
-      "distance_from_route_miles": 0.2, "estimated_detour_miles": 0.4,
-      "fuel_on_arrival_gallons": 12.33, "gallons_purchased": 7.699, "fuel_on_departure_gallons": 20.02, "cost": 23.43,
+      "location": { "lat": 36.916934, "lon": -89.333912, "precision": "city-level (approximate)",
+                    "confidence": "high", "matched_route_highways": ["I57"],
+                    "confidence_reason": "Address names I57, which the route uses near mile 377: the stop is very likely at an exit on the route." },
+      "price_per_gallon": 3.044, "mile_marker": 376.53,
+      "distance_from_route_miles": 0.21, "estimated_detour_miles": 0.42,
+      "leg_from_previous": { "miles": 376.75, "fuel_used_gallons": 37.675 },
+      "fuel_on_arrival_gallons": 12.325, "gallons_purchased": 7.699, "fuel_on_departure_gallons": 20.024, "cost": 23.44,
       "decision": "reach_cheaper_station",
       "reason": "Bought only enough to reach PIT STOP (Wheatley, AR) at mile 576, which is cheaper ($2.999 vs $3.044/gal)."
     }
     /* … PIT STOP, Wheatley AR (22.531 gal, $67.57); EXTRA MILE TRUCK STOP, Hooks TX (16.128 gal, $45.44) */
   ],
   "fuel_cost": {
-    "total_fuel_cost": 306.39,
-    "purchased_during_trip":  { "gallons": 46.358, "cost": 136.44, "number_of_stops": 3 },
-    "starting_fuel_estimate": {
-      "gallons_in_tank_at_start": 50.0, "gallons_used": 50.0, "price_per_gallon": 3.399,
-      "valuation_method": "nearest_corridor_station", "estimated_value_of_fuel_used": 169.95,
-      "valued_at_station": { "opis_id": 73127, "name": "Gas N Wash", "city": "Chicago", "state": "IL", "mile_marker": 0.0, "distance_from_route_miles": 0.0 }
-    },
+    "total_fuel_cost": 306.40,
+    "purchased_during_trip":  { "gallons": 46.358, "cost": 136.45, "number_of_stops": 3 },
+    "starting_fuel_estimate": { "gallons_in_tank_at_start": 50.0, "gallons_used": 50.0, "price_per_gallon": 3.399,
+                                "valuation_method": "nearest_corridor_station", "estimated_value_of_fuel_used": 169.95,
+                                "valued_at_station": { "name": "Gas N Wash", "city": "Chicago", "state": "IL", "…": "…" } },
     "how_total_is_calculated": "starting_fuel_estimate.estimated_value_of_fuel_used + purchased_during_trip.cost",
     "currency": "USD"
   },
-  "fuel_usage": {
-    "route_distance_miles": 961.5, "estimated_detour_miles": 2.1, "total_miles_driven": 963.6,
-    "fuel_burned_gallons": 96.358, "fuel_remaining_at_destination_gallons": 0.0
-  },
-  "assumptions": { "vehicle_range_miles": 500.0, "vehicle_mpg": 10.0, "tank_capacity_gallons": 50.0, "station_corridor_miles": 15.0, "…": "…" },
+  "fuel_usage": { "route_distance_miles": 961.47, "estimated_detour_miles": 2.11, "total_miles_driven": 963.58,
+                  "fuel_burned_gallons": 96.358, "fuel_remaining_at_destination_gallons": 0.0,
+                  "final_leg": { "miles": 161.28, "fuel_used_gallons": 16.128 }, "longest_leg_miles": 376.75, "max_range_miles": 500.0 },
+  "data_quality": { "route_distance_and_geometry": "from the routing provider (osrm)",
+                    "station_positions": "estimated: city-level reference point of the station's city",
+                    "location_confidence": { "high": 3, "medium": 0, "low": 0 },
+                    "detours": "estimated: 2 x straight-line distance from the route to the city point (conservative)",
+                    "prices": "static OPIS file; average of a station's price rows",
+                    "starting_fuel_value": "estimated: start price x starting gallons used",
+                    "money_rounding": "each purchase rounded to the cent; totals are sums of the shown parts" },
+  "assumptions": { "vehicle_range_miles": 500.0, "vehicle_mpg": 10.0, "tank_capacity_gallons": 50.0,
+                   "station_corridor_miles": 15.0, "min_location_confidence": "low", "…": "…" },
   "warnings": [ "Station coordinates are approximate: …", "Prices come from the supplied OPIS file …" ],
-  "meta": {
-    "map_api_calls": { "routing": 1, "geocoding": 0 },
-    "route_cache_hit": false, "stations_loaded": 6620, "corridor_stations": 228, "stations_considered_by_optimizer": 108,
-    "timings_ms": { "resolve_locations": 0.2, "routing": 2795.7, "station_matching": 54.4, "fuel_optimization": 19.3, "response_geometry": 574.3, "total_request": 3470.4 }
-  }
+  "meta": { "map_api_calls": { "routing": 1, "geocoding": 0 }, "route_cache_hit": false, "plan_cache_hit": false,
+            "corridor_stations": 228, "stations_considered_by_optimizer": 108, "station_data_fingerprint": "a7e1ea968271cf0e",
+            "timings_ms": { "routing": 1868.2, "station_matching": 23.3, "fuel_optimization": 21.5, "total_request": 2013.6, "…": "…" } }
 }
 ```
+
+Every number can be checked by hand:
+* $23.44 + $67.57 + $45.44 = $136.45;
+* $169.95 + $136.45 = $306.40;
+* 50 − 37.675 = 12.325 gal on arrival, and 12.325 + 7.699 = 20.024 gal on departure.
 
 **Money is split in two:**
 * **`purchased_during_trip`:** money actually spent at the recommended stops.
@@ -162,10 +175,11 @@ Every error has the same shape, `{"error": {"code", "message", "details"}}`.
 | 422 | `location_not_found` | The text cannot be resolved |
 | 422 | `route_not_found` | The provider finds no drivable route (e.g. Los Angeles → Honolulu) |
 | 422 | `no_feasible_fuel_plan` | Some stretch longer than 500 miles has no usable station; `details` names the gap |
+| 429 | `rate_limited` | More than `ROUTE_RATE_LIMIT` (default 60/min) planning requests from one IP. Includes `Retry-After`. |
 | 502 | `routing_provider_error` | The provider answered with something unusable |
 | 503 | `routing_unavailable` / `geocoder_unavailable` | The provider is unreachable or rate-limited |
 | 503 | `station_data_unavailable` | No stations loaded: run `load_stations` |
-| 504 | `routing_timeout` | The provider timed out (connect 5 s, read 25 s) |
+| 504 | `routing_timeout` | The provider timed out: connect 5 s, read 15 s, **30 s hard limit for the whole call** |
 | 500 | `internal_error` | Unexpected error. It is logged, and no stack trace is returned. |
 
 A failed request never returns a made-up route, and nothing is saved.
@@ -178,9 +192,12 @@ POST /api/v1/route/
   ▼
 services/planner.py ── orchestrates and times each step
   ├─ geocoding_service   "City, ST" / "lat,lng" → coordinates, offline (Census gazetteer); Nominatim only for free text
-  ├─ routing_service     1 OSRM call (overview=full, geojson) → cached in the DB cache; 0 calls on a cache hit
+  ├─ plan cache          identical request (same route, options, station data) → answered without routing work
+  ├─ routing_service     1 OSRM call (overview=full, polyline6, steps) → cached in the DB cache; 0 calls on a hit;
+  │                      single flight for concurrent identical requests; 30 s hard deadline
   ├─ station_service     6,620 stations loaded from the DB once per process into numpy arrays
   ├─ route_matching      route resampled every 2 mi → grid + bbox pre-filter → mile marker and off-route distance
+  ├─ highways            address highway (e.g. I-80) vs the route's highway refs → location confidence
   ├─ fuel_optimizer      exact minimum-cost refuelling (dynamic programme)
   └─ cost_calculator     starting-fuel valuation, per-stop gallons and cost, totals (rounded only at output)
   ▼
@@ -217,6 +234,14 @@ roughly 2 s load.
    the cost of all fuel burned.
 6. Fuel left at the destination is reported but **not credited**. Otherwise
    the optimiser would be rewarded for buying cheap fuel it never burns.
+7. **Rounding.**
+   * The optimiser works unrounded.
+   * Displayed fuel levels are rounded to 0.001 gal at each stop. Gallons
+     bought = departure − arrival, and fuel used on a leg = previous
+     departure − arrival, so the displayed ledger balances exactly.
+   * Money is rounded per purchase, half up, like a pump receipt: gallons
+     shown × price, where prices keep their stored 5 decimals.
+   * Every total is the sum of its displayed parts.
 
 Consequences:
 * A trip of 500 miles or less needs no stop.
@@ -305,6 +330,10 @@ C(u,g) = min( −g·p_u + min_{v cheaper/equal, d(u,v) ≥ g} [ d(u,v)·p_u + C(
 * **Ledger check on every plan:** fuel never below 0, never above capacity,
   every stop buys something, and fuel in + purchases − fuel burned = fuel left.
 
+**On real routes.** Across 30 diverse US routes, 81 stops in total, no plan
+visited a station twice or made two stops at the same mile marker. If a plan
+ever does, the response adds a warning explaining it.
+
 **Claim.** Under the model above, the optimiser returns the minimum refuelling
 cost. Real-road optimality also depends on the estimated detours and
 city-level station positions (see [limitations](#known-limitations)).
@@ -334,7 +363,8 @@ from census.gov.
 ## Routing and station matching
 
 * **Routing:**
-  * The OSRM public demo server (no key), using `overview=full&geometries=geojson`.
+  * The OSRM public demo server (no key), using `overview=full&geometries=polyline6&steps=true`.
+    The steps carry the highway refs used for location confidence, and it is still one request.
   * **One call per new start/finish pair.** Routes are cached in the database
     cache, so a repeated request makes **zero** routing calls. The cache
     survives restarts and is shared between worker processes.
@@ -368,57 +398,88 @@ point. To stay safe:
 * every response carries a warning, and every stop shows its estimated
   distance from the route.
 
+### Location confidence (no extra API calls)
+
+The station file's addresses name highways (e.g. `I-80, EXIT 143 & CR-S14`).
+The single OSRM call also returns the highway refs along the route
+(`I 80; US 6`). Each stop is rated:
+
+| Confidence | Rule | 81 stops on 30 real routes |
+|---|---|---|
+| `high` | The address names a highway (I-, US- or state route) the route uses within (distance from route + 5) miles of the stop's mile marker, so the stop is very likely at an exit on the route | 61 (75 %) |
+| `medium` | No highway match, but the city point is within 3 miles of the route | 16 |
+| `low` | Neither. The real detour may be longer than estimated, and the response warns. | 4 |
+
+* This raises confidence but does **not** produce exact coordinates.
+* It is **not** used to shrink the conservative detour estimate.
+* `min_location_confidence=high` makes the optimiser use only high-confidence
+  stations. On the 30 routes this cost **+$20.64 in total (+0.2 %)**. The worst
+  single route was +$5.84, and every route stayed feasible.
+
 ## Performance
 
-Measured on 2026-11-16 over real HTTP, with `runserver` and `DEBUG=False`, on
-a Windows laptop. The CPU was already 55–70 % busy with other software, so
-treat these as indicative.
+Measured on 2026-11-16 over real HTTP, with `runserver` (threaded) and
+`DEBUG=False`, on a Windows laptop whose CPU was already partly busy, so treat
+these as indicative. "Before" is the v1.0 build; "after" is this version.
 
-| Request | Routing calls | Total time |
-|---|---|---|
-| New York → Los Angeles, **fresh process, uncached** | 1 | 3,337 ms (OSRM: 2,929 ms) |
-| New York → Los Angeles, cached route (5 runs) | 0 | median **240 ms** (181–298) |
-| New York → Los Angeles, **after a server restart**, cached route | 0 | 325 ms |
-| Chicago → Dallas, uncached / cached | 1 / 0 | 3,485 ms / **118 ms** |
-| Washington → New York, uncached / cached | 1 / 0 | 3,350 ms / **57 ms** |
-| Seattle → Miami (3,303 mi), uncached / cached | 1 / 0 | 4,038 ms / **206 ms** |
-| Saved map page / saved plan JSON | 0 | 108 ms / 39 ms |
-| Validation error / outside-USA error | 0 | 32 ms / 19 ms |
+| Request | Routing calls | Before | After |
+|---|---|---|---|
+| New York → Los Angeles, fresh process, uncached | 1 | 3,337 ms | 3,205 ms (OSRM: 2,756 ms) |
+| New York → Los Angeles, cached (median of 5) | 0 | 240 ms | **105 ms** |
+| Chicago → Dallas, cached | 0 | 118 ms | **68 ms** |
+| Washington → New York, cached | 0 | 57 ms | **51 ms** |
+| 8 concurrent clients × 6 cached requests | 0 | 5.4 req/s, p50 1,185 ms, p95 2,194 ms | **23.4 req/s, p50 304 ms, p95 432 ms** |
+| 4 concurrent identical **uncached** requests | **1 in total** | 1 call, but up to **30 min** while OSRM trickled its response | 1 call, 4.3 s; hard 30 s limit |
+| Validation error / outside-USA error | 0 | 32 / 19 ms | 39 / 16 ms |
 
 * **Uncached requests:** the OSRM call is 85–97 % of the time.
-* **Cached requests:** the time goes to station matching (about 10–130 ms) and
-  the optimiser (about 2–115 ms). Both are in-memory numpy/Python.
-* **Startup:** preloading takes about 1.7–2.2 s at server start instead of on
-  the first request.
-* **Response size:** 62 KB for New York → Los Angeles. The geometry is
-  simplified from 35,357 to 2,607 points; matching uses the full geometry.
+* **Cached requests:** identical requests (same route, options and station
+  data) are served from the **plan cache** without routing, matching or
+  optimisation. The station-data fingerprint in the cache key means
+  `load_stations` with new data can never serve an old plan.
+* **Startup:** the place gazetteer and station index are preloaded (about
+  1.4–2.2 s).
+* **Response size:** 62–71 KB for coast-to-coast routes. The geometry is
+  simplified from about 35,000 to about 2,600 points; matching uses the full
+  geometry.
+* **Provider payload:** OSRM is asked for `polyline6` + `steps`: 615 KB instead
+  of 822 KB of GeoJSON. It is decoded with a vectorised numpy decoder in 34 ms;
+  a pure-Python loop took 202 ms.
 
 ## Testing
 
 ```bash
-python manage.py test tests                                          # 118 offline tests (~10-15 s)
+python manage.py test tests                                          # 144 offline tests (~15 s)
 RUN_LIVE_TESTS=1 python manage.py test tests.test_live_integration   # 3 tests that call the real OSRM server
 python manage.py check && python manage.py makemigrations --check --dry-run
 ```
 
-Results of the last run on 2026-11-16: **118 offline tests passed**, plus
-**3 live tests passed** (`RUN_LIVE_TESTS=1`). `check` reported no issues.
+Results of the last run on 2026-11-16: **144 offline tests passed**, plus
+**3 live tests passed** (`RUN_LIVE_TESTS=1`). `check` reported no issues, and
+`pip-audit` found no known vulnerabilities in `requirements.txt`.
 
 | Module | Tests | Covers | External services |
 |---|---|---|---|
 | `test_station_dataset` | 18 | CSV validation, malformed rows, Canada filter, exact duplicates, averaging, gazetteer normalisation and aliases, bounding boxes | none |
 | `test_commands` | 5 | `build_station_dataset` → `load_stations` → database, fallback geocoder caching, wrong-state rejection, malformed CSV | **mocked** geocoder |
 | `test_geo_and_matching` | 19 | Distances, polyline, simplification, resampling, mile markers, corridor edge, bbox-vs-geometry, many stations | none |
+| `test_highways_and_polyline` | 5 | Address and OSRM highway parsing, confidence rules, vectorised decoder against the reference, malformed polylines | none |
 | `test_routing_and_geocoding` | 28 | OSRM/ORS parsing, NoRoute, timeout, 429, 5xx, bad payloads, route cache, location resolution, station index | **mocked** HTTP |
 | `test_fuel_optimizer` | 22 | Hand-calculated cases, infeasibility, 3,500 random cases against the exact reference, ledger checks, performance | none |
-| `test_cost_calculator` | 6 | Start-price choice, starting fuel kept separate from refuelling, detours in fuel burned, rounding | none |
+| `test_cost_calculator` | 7 | Start price, starting fuel kept separate, detours, rounding; **property test: 300 random plans re-add exactly** | none |
 | `test_api` | 20 | JSON structure, status codes, persistence, saved map after a simulated restart, caching, all error paths | **mocked** OSRM |
-| `test_live_integration` | 3 | Real OSRM route and matching, real "no route", full HTTP → OSRM → plan → map, cache hit | **real** OSRM |
+| `test_robustness` | 20 | Single flight with 8 threads, trickling-response deadline, oversized response, hung-call waiters, corrupted cache, plan cache and its invalidation, rate limit including spoofed `X-Forwarded-For`, zero-length route, corridor bounds, hostile strings, confidence filter, invariant guard | **mocked** |
+| `test_live_integration` | 3 | Real OSRM route, highway refs and matching; real "no route"; full HTTP → OSRM → plan → map; cache hit | **real** OSRM |
 
-The Postman collection was also run end to end with Newman against a live
-server: 13 requests, 33 assertions, 0 failures. The map page was rendered in
-headless Edge with no JavaScript errors: route line, 9 stop markers, and start
-and finish markers.
+Further checks:
+* **Postman via Newman** against a live server with the default rate limit:
+  14 requests, 50 assertions, 0 failures.
+* **Map page in headless Edge**, for a new plan and for a plan saved before
+  v1.1: no JavaScript errors, with the route line, stop markers and legend
+  present. The stacked mobile layout was checked at 600 px.
+* **30-route audit:** every plan was re-checked independently. Legs are all
+  ≤ 500 mi (longest 498.57), fuel never goes below 0 or above 50 gal, and the
+  published ledger balances exactly.
 
 ## Postman
 
@@ -428,14 +489,16 @@ Import `postman/Spotter_Fuel_Route_API.postman_collection.json`. Its
 | Folder | Requests |
 |---|---|
 | 0. Health | health check |
-| 1. Successful routes | short route without a stop; multi-stop New York → Los Angeles (saves `plan_id`/`map_url`); cost breakdown; `lat,lng` input; custom corridor; saved plan JSON; saved map HTML |
+| 1. Successful routes | short route without a stop; multi-stop New York → Los Angeles (saves `plan_id`/`map_url`); cost breakdown; `lat,lng` input; only high-confidence stops; custom corridor; saved plan JSON; saved map HTML |
 | 2. Invalid input | missing finish (400), outside USA (422), invalid coordinates (400) |
 | 3. Impossible routes | Los Angeles → Honolulu (422 `route_not_found`), Anchorage → Seattle (422 `no_feasible_fuel_plan`) |
 | 4. Provider failures | 503 `routing_unavailable` and 504 `routing_timeout`. These need the server started with a broken `OSRM_BASE_URL` (instructions are in the folder). |
 
 * **Test scripts:** every request checks the status code and key fields. The
-  successful routes also check that `total = starting fuel estimate +
-  purchased during trip`.
+  successful routes also check that:
+  * `total = starting fuel estimate + purchased during trip`;
+  * the stop costs add up to the trip cost;
+  * no leg exceeds the vehicle range.
 * **Example responses:** these are real captures from a local run. Long
   geometry and stop lists are truncated where marked.
 * **Running from the command line:**
@@ -461,7 +524,9 @@ All configuration comes from environment variables or `.env`. See `.env.example`
 | `ROUTING_PROVIDER` | `osrm` | `osrm` or `openrouteservice` |
 | `OSRM_BASE_URL` | `https://router.project-osrm.org` | Point this at a self-hosted OSRM for production |
 | `ORS_BASE_URL` / `ORS_API_KEY` | HeiGIT endpoint / empty | OpenRouteService settings |
-| `ROUTING_CONNECT_TIMEOUT` / `ROUTING_READ_TIMEOUT` | `5` / `25` s | Provider timeouts |
+| `ROUTING_CONNECT_TIMEOUT` / `ROUTING_READ_TIMEOUT` | `5` / `15` s | Per-connection and per-read timeouts |
+| `ROUTING_TOTAL_TIMEOUT` | `30` s | Hard limit for a whole provider call. `requests` timeouts alone do not bound a trickling response. |
+| `ROUTE_RATE_LIMIT` | `60/min` | Per-client-IP limit on `POST /api/v1/route/` (empty disables). Clients are identified by `REMOTE_ADDR`. |
 | `ROUTING_MIN_INTERVAL_SECONDS` | `1` | Minimum gap between routing calls per process (OSRM demo policy) |
 | `ROUTE_CACHE_SECONDS` | `604800` (7 days) | Route cache lifetime |
 | `GEOCODER_FALLBACK_ENABLED` | `True` | Use Nominatim for free-text inputs |
@@ -489,6 +554,16 @@ warnings until those HTTPS settings are switched on.
   second, and is for non-commercial use only. Use a self-hosted OSRM or
   OpenRouteService in production. Uncached requests take 2–4 s, almost all of
   it the routing call.
+* **Single flight works within one process.** Several server processes could
+  each make one call for the same new route. That is still one call per
+  process, and the results are shared through the database cache afterwards.
+* **CPU-bound work shares Python's global interpreter lock (GIL).** On cache
+  misses, one process handles about 5 concurrent plan computations per
+  second; use several worker processes in production. Identical requests are
+  served from the plan cache.
+* **Location confidence comes from address text.** It relies on OPIS address
+  strings and OpenStreetMap highway refs. Addresses like `HIGHWAY 11/17` are
+  ambiguous and are deliberately not matched.
 * **USA check for coordinates.** A point is accepted when a US Census place is
   within 25 miles, so points just across the border can pass.
 * **Local server only.** This setup is for local use with `runserver`. A
@@ -507,8 +582,8 @@ the collection imported. Have the editor open on `route_api/services/`.
 | 1:15–2:30 | Postman: multi-stop New York → Los Angeles; scroll `fuel_stops`, `fuel_cost`, `meta`. Send again. Open `map_url` in a browser. | "Nine stops, each with gallons, cost and the reason it was chosen. Money spent on the trip is kept separate from the estimated value of the starting tank. `meta` shows 1 routing call. On the second send it's 0, a cache hit, and about 0.2 seconds." |
 | 2:30–3:00 | Postman: missing finish (400), Toronto (422), Anchorage → Seattle (422) | "Clear errors with consistent codes. Anchorage to Seattle is impossible because there's no usable station for 2,178 miles, and the API says exactly where the gap is." |
 | 3:00–3:50 | Editor: `fuel_optimizer.py` docstring | "The optimiser is an exact dynamic programme from the gas-station-problem literature. If the next stop is cheaper, buy just enough to reach it; otherwise fill up. That keeps the state space small, and it runs in milliseconds for hundreds of stations." |
-| 3:50–4:20 | Editor: `test_fuel_optimizer.py` brute-force reference; terminal running `python manage.py test tests` | "It's checked against an independent exhaustive search on 3,500 random cases in the suite and 20,000 in a one-off sweep, with zero mismatches. 118 offline tests, plus live OSRM tests." |
-| 4:20–4:40 | README "Known limitations" | "The main limitation: the price file has no coordinates, so stations sit at city level. Detours are estimated cautiously, and every response says so." |
+| 3:50–4:20 | Editor: `test_fuel_optimizer.py` brute-force reference; terminal running `python manage.py test tests` | "It's checked against an independent exhaustive search on 3,500 random cases in the suite and 20,000 in a one-off sweep, with zero mismatches. 144 offline tests cover concurrency, timeouts, caching and hand-checkable numbers, plus live OSRM tests." |
+| 4:20–4:40 | Map legend; README "Location confidence" | "The price file has no coordinates, so stations sit at city level. Each stop is rated by checking whether its address highway is on the route; 75 % of stops on 30 test routes are high confidence, and you can require that for about 0.2 % extra cost." |
 
 ## Project layout
 
@@ -527,7 +602,7 @@ data/
   processed/                fuel_stations.csv (6,620), ingestion report, rejected records, unmatched cities
   cache/                    one-time fallback geocoder answers
 postman/                    Postman collection
-tests/                      121 tests (118 offline, 3 live)
+tests/                      147 tests (144 offline, 3 live)
 fuel-prices-for-be-assessment.csv          original price file (unchanged)
 Spotter_Django_Backend_Assessment.txt      original assignment text
 ```
@@ -536,3 +611,21 @@ Data credits:
 * US Census Bureau Gazetteer Files (public domain).
 * © OpenStreetMap contributors (ODbL). This covers the routing data used by
   OSRM, the Nominatim geocoder and the map tiles.
+
+## Quality audit (v1.1)
+
+A final audit re-checked the delivered v1.0 build: 30 real routes, concurrent
+load, a browser, and the API output read with a reviewer's eye. Defects found
+and fixed:
+
+| Finding | Evidence | Fix |
+|---|---|---|
+| A routing call could hang for **30 minutes** | Measured: OSRM trickled a response; `requests` timeouts only bound each read. Single flight made 3 more requests wait as long. | Body streamed under a hard 30 s deadline with a size cap (also for Nominatim); single-flight waiters give up at the deadline. Regression test with a trickling fake response. |
+| Concurrent identical uncached requests could each call OSRM | Code review | Single flight per route key, tested with 8 threads (exactly 1 call) |
+| Published numbers didn't add up by hand | 6 of 30 real plans: stop costs ≠ trip cost by 1 cent; 11 had a ledger rebuilt from displayed values going over 50 gal | Per-purchase cent rounding in `Decimal`; ledger built from rounded fuel levels; per-leg fuel published; property test over 300 random plans |
+| Starting-fuel value depended on the confidence filter | The `medium` filter appeared cheaper than no filter on real routes | Valued against the full corridor; monotonicity tested |
+| Cached requests slow under concurrency | 8 clients: 5.4 req/s, p95 2.2 s | Plan cache keyed on route, options, station-data fingerprint and version: 23.4 req/s, p95 0.43 s |
+| A corrupted cache entry would break requests | Code review | Treated as a miss, then refetched and replaced; tested |
+| No protection for the free upstream services | Code review | Per-IP rate limit (`REMOTE_ADDR` only, so a spoofed `X-Forwarded-For` doesn't bypass it); SQLite WAL with `IMMEDIATE` transactions for concurrent writes |
+| City-level positions gave no sense of reliability | 30-route audit | Location confidence from address highways against route highway refs, from the same single OSRM call; optional `min_location_confidence` |
+| Map: no feedback when Leaflet or tiles fail, not responsive, sparse popups | Headless browser review | Error notices, stacked mobile layout, confidence legend, detailed popups, clickable stop list, works with plans saved before v1.1 |

@@ -6,7 +6,9 @@ non-commercial, no SLA). OpenRouteService can be selected with
 ``ROUTING_PROVIDER=openrouteservice`` and ``ORS_API_KEY``.
 
 Results are cached in Django's cache (database-backed by default) keyed by the
-rounded coordinates, so repeated requests make zero routing calls.
+rounded coordinates, so repeated requests make zero routing calls. Concurrent
+identical requests in one process share a single provider call ("single
+flight"), and a corrupted cache entry is treated as a miss.
 """
 
 from __future__ import annotations
@@ -16,7 +18,7 @@ import logging
 import threading
 import time
 import zlib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 import numpy as np
 import requests
@@ -24,12 +26,15 @@ from django.conf import settings
 from django.core.cache import cache
 
 from .errors import RouteNotFound, RoutingProviderError, RoutingTimeout, RoutingUnavailable
-from .geo import METERS_PER_MILE
+from .geo import METERS_PER_MILE, decode_polyline_array
+from .highways import RoadSegment, route_ref_tokens
+from .http_utils import DeadlineExceeded, ResponseTooLarge, read_with_deadline
 
 logger = logging.getLogger(__name__)
 
-CACHE_VERSION = "v2"
+CACHE_VERSION = "v3"
 CACHE_PRECISION = 5  # ~1 m; coordinates are rounded to this many decimals for the cache key
+MAX_RESPONSE_BYTES = 20 * 1024 * 1024  # a coast-to-coast OSRM answer is ~0.6 MB
 
 
 @dataclass
@@ -41,6 +46,8 @@ class RouteResult:
     from_cache: bool = False
     provider_calls: int = 0  # external routing calls made for this result (0 if cached)
     provider_ms: float = 0.0
+    # Highway refs along the route (from OSRM steps), used for location confidence.
+    road_segments: list[RoadSegment] = field(default_factory=list)
 
 
 class RoutingProvider:
@@ -54,6 +61,7 @@ class RoutingProvider:
         self.cfg = cfg
         self.session = session or requests.Session()
         self.timeout = (cfg["ROUTING_CONNECT_TIMEOUT"], cfg["ROUTING_READ_TIMEOUT"])
+        self.total_timeout = float(cfg.get("ROUTING_TOTAL_TIMEOUT") or 30.0)
         self.headers = {"User-Agent": cfg["HTTP_USER_AGENT"]}
 
     def route(self, start: tuple[float, float], finish: tuple[float, float]) -> RouteResult:
@@ -71,9 +79,16 @@ class RoutingProvider:
 
     def _send(self, method: str, url: str, **kwargs) -> requests.Response:
         self._respect_min_interval()
+        deadline = time.monotonic() + self.total_timeout
         try:
             headers = self.headers | kwargs.pop("headers", {})
-            return self.session.request(method, url, timeout=self.timeout, headers=headers, **kwargs)
+            response = self.session.request(method, url, timeout=self.timeout, headers=headers, stream=True, **kwargs)
+            return read_with_deadline(response, deadline, MAX_RESPONSE_BYTES)
+        except DeadlineExceeded as exc:
+            raise RoutingTimeout(
+                f"Routing provider ({self.name}) did not finish responding within {self.total_timeout:.0f} s.") from exc
+        except ResponseTooLarge as exc:
+            raise RoutingProviderError(f"Routing provider ({self.name}) returned an oversized response.") from exc
         except requests.Timeout as exc:
             raise RoutingTimeout(f"Routing provider ({self.name}) timed out.") from exc
         except requests.RequestException as exc:
@@ -111,7 +126,9 @@ class OSRMProvider(RoutingProvider):
             f"{self.cfg['OSRM_BASE_URL']}/route/v1/driving/"
             f"{start[1]:.6f},{start[0]:.6f};{finish[1]:.6f},{finish[0]:.6f}"
         )
-        params = {"overview": "full", "geometries": "geojson", "alternatives": "false", "steps": "false"}
+        # polyline6 + steps: smaller payload than GeoJSON (~615 KB vs ~820 KB coast to coast) and the
+        # steps carry the highway refs ("I 80; US 6") used for location confidence. Still ONE request.
+        params = {"overview": "full", "geometries": "polyline6", "alternatives": "false", "steps": "true"}
         response = self._send("GET", url, params=params)
         if response.status_code == 429:
             raise RoutingUnavailable("Routing provider (osrm) rate limit reached; retry shortly.")
@@ -131,10 +148,25 @@ class OSRMProvider(RoutingProvider):
             route = data["routes"][0]
             distance_m = float(route["distance"])
             duration_s = float(route["duration"])
-            coords = self._coords_from_geojson(route["geometry"]["coordinates"], self.name)
-        except (KeyError, IndexError, TypeError, ValueError) as exc:
+            coords = decode_polyline_array(route["geometry"], precision=6)
+            steps = [step for leg in route.get("legs", []) for step in leg.get("steps", [])]
+            segments = self._road_segments(steps)
+        except (KeyError, IndexError, TypeError, ValueError, AttributeError) as exc:
             raise RoutingProviderError("Routing provider (osrm) returned an unexpected payload.") from exc
-        return RouteResult(distance_m / METERS_PER_MILE, duration_s, coords, self.name)
+        if len(coords) < 2 or not np.isfinite(coords).all():
+            raise RoutingProviderError("Routing provider (osrm) returned an empty or invalid route geometry.")
+        return RouteResult(distance_m / METERS_PER_MILE, duration_s, coords, self.name, road_segments=segments)
+
+    @staticmethod
+    def _road_segments(steps: list[dict]) -> list[RoadSegment]:
+        segments, mile = [], 0.0
+        for step in steps:
+            length = float(step.get("distance", 0.0)) / METERS_PER_MILE
+            refs = route_ref_tokens(step.get("ref", ""))
+            if refs and length > 0:
+                segments.append(RoadSegment(mile, mile + length, refs))
+            mile += length
+        return segments
 
 
 class OpenRouteServiceProvider(RoutingProvider):
@@ -192,16 +224,54 @@ def route_cache_key(provider: str, start, finish) -> str:
     return f"route:{CACHE_VERSION}:{hashlib.sha256(raw.encode()).hexdigest()[:32]}"
 
 
+_inflight_guard = threading.Lock()
+_inflight: dict[str, threading.Lock] = {}
+
+
+def _from_cache(key: str, provider_name: str) -> RouteResult | None:
+    cached = cache.get(key)
+    if not cached:
+        return None
+    try:
+        coords = np.frombuffer(zlib.decompress(cached["coords"]), dtype="<f8").reshape(-1, 2)
+        segments = [RoadSegment(a, b, frozenset(refs)) for a, b, refs in cached.get("roads", [])]
+        if len(coords) < 1:
+            raise ValueError("empty geometry")
+        return RouteResult(float(cached["distance_miles"]), cached["duration_seconds"], coords,
+                           provider_name, from_cache=True, provider_calls=0, road_segments=segments)
+    except (KeyError, TypeError, ValueError, zlib.error) as exc:
+        logger.warning("discarding corrupted route cache entry %s: %s", key, exc)
+        cache.delete(key)
+        return None
+
+
 def get_route(start: tuple[float, float], finish: tuple[float, float], provider: RoutingProvider | None = None) -> RouteResult:
     """Return the driving route, from cache when possible (0 calls) or 1 provider call."""
     provider = provider or get_provider()
     key = route_cache_key(provider.name, start, finish)
-    cached = cache.get(key)
+    cached = _from_cache(key, provider.name)
     if cached:
-        coords = np.frombuffer(zlib.decompress(cached["coords"]), dtype="<f8").reshape(-1, 2)
-        return RouteResult(cached["distance_miles"], cached["duration_seconds"], coords,
-                           provider.name, from_cache=True, provider_calls=0)
+        return cached
 
+    # Single flight: concurrent identical requests wait for the first one's result.
+    with _inflight_guard:
+        key_lock = _inflight.setdefault(key, threading.Lock())
+    # Waiters give up at the provider's total deadline instead of queueing indefinitely.
+    if not key_lock.acquire(timeout=provider.total_timeout + 5):
+        raise RoutingTimeout("Timed out waiting for an identical routing request in progress.")
+    try:
+        cached = _from_cache(key, provider.name)
+        if cached:
+            return cached
+        return _fetch_and_cache(key, provider, start, finish)
+    finally:
+        key_lock.release()
+        with _inflight_guard:
+            if _inflight.get(key) is key_lock:
+                _inflight.pop(key, None)
+
+
+def _fetch_and_cache(key: str, provider: RoutingProvider, start, finish) -> RouteResult:
     t0 = time.perf_counter()
     try:
         result = provider.route(start, finish)
@@ -215,5 +285,6 @@ def get_route(start: tuple[float, float], finish: tuple[float, float], provider:
         "duration_seconds": result.duration_seconds,
         # Raw float64 [lat, lon] pairs, zlib-compressed: lossless and fast to load.
         "coords": zlib.compress(np.ascontiguousarray(result.coordinates, dtype="<f8").tobytes(), 1),
+        "roads": [(seg.start_mile, seg.end_mile, sorted(seg.refs)) for seg in result.road_segments],
     })  # default timeout from CACHES (ROUTE_CACHE_SECONDS)
     return result

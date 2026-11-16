@@ -7,7 +7,7 @@ import math
 import numpy as np
 import requests
 
-from route_api.services.geo import EARTH_RADIUS_MILES
+from route_api.services.geo import EARTH_RADIUS_MILES, encode_polyline
 from route_api.services.station_service import StationIndex, StationRecord
 
 LOCMEM_CACHE = {"default": {"BACKEND": "django.core.cache.backends.locmem.LocMemCache", "LOCATION": "tests"}}
@@ -44,12 +44,18 @@ class FakeSession:
         return self.request("GET", url, **kwargs)
 
 
-def osrm_ok(coords_latlon, distance_m=100_000.0, duration_s=3600.0):
+def osrm_ok(coords_latlon, distance_m=100_000.0, duration_s=3600.0, steps=None):
+    """A successful OSRM /route response in the format we request (polyline6 + steps).
+
+    ``steps``: optional list of (distance_m, ref) tuples; defaults to one unnamed step.
+    """
+    steps = steps if steps is not None else [(distance_m, "")]
     return FakeResponse(200, {
         "code": "Ok",
         "routes": [{
             "distance": distance_m, "duration": duration_s,
-            "geometry": {"type": "LineString", "coordinates": [[lon, lat] for lat, lon in coords_latlon]},
+            "geometry": encode_polyline(list(coords_latlon), precision=6),
+            "legs": [{"steps": [{"distance": d, "ref": ref, "name": ""} for d, ref in steps]}],
         }],
         "waypoints": [],
     })

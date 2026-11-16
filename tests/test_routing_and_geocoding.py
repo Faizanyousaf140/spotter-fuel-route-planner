@@ -42,7 +42,8 @@ class OSRMProviderTests(SimpleTestCase):
         self.assertEqual(route.coordinates.tolist()[0], list(NYC))
         call = session.calls[0]
         self.assertIn("/route/v1/driving/-74.006000,40.712800;-118.243700,34.052200", call["url"])
-        self.assertEqual(call["params"]["geometries"], "geojson")
+        self.assertEqual(call["params"]["geometries"], "polyline6")
+        self.assertEqual(call["params"]["steps"], "true")
         self.assertEqual(call["params"]["overview"], "full")
         self.assertIn("User-Agent", call["headers"])
         self.assertEqual(call["timeout"], (CFG["ROUTING_CONNECT_TIMEOUT"], CFG["ROUTING_READ_TIMEOUT"]))
@@ -89,10 +90,13 @@ class OSRMProviderTests(SimpleTestCase):
                 provider.route(NYC, LA)
 
     def test_empty_or_invalid_geometry(self):
-        for coords in ([], [[-74.0, 40.7]], [[-74.0, "x"], [-75.0, 41.0]]):
-            payload = {"code": "Ok", "routes": [{"distance": 1, "duration": 1, "geometry": {"coordinates": coords}}]}
+        from route_api.services.geo import encode_polyline
+
+        one_point = encode_polyline([(40.7, -74.0)], precision=6)
+        for geometry in ("", one_point, one_point[:-1], "not a polyline é", None, {"coordinates": []}):
+            payload = {"code": "Ok", "routes": [{"distance": 1, "duration": 1, "geometry": geometry, "legs": []}]}
             provider, _ = osrm(FakeResponse(200, payload))
-            with self.subTest(coords=coords), self.assertRaises(RoutingProviderError):
+            with self.subTest(geometry=geometry), self.assertRaises(RoutingProviderError):
                 provider.route(NYC, LA)
 
 

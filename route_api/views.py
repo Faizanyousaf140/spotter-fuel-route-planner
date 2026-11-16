@@ -6,12 +6,25 @@ from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.response import Response
+from rest_framework.throttling import SimpleRateThrottle
 from rest_framework.views import APIView
 
 from .exceptions import error_body
 from .models import FuelStation, RoutePlan
 from .serializers import RouteRequestSerializer
 from .services.planner import plan_route
+
+
+class RoutePlanRateThrottle(SimpleRateThrottle):
+    """Per-client-IP limit for planning requests; rate read from settings at request time."""
+
+    scope = "route_plans"
+
+    def get_rate(self):
+        return settings.FUEL_PLANNER.get("ROUTE_RATE_LIMIT") or None
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {"scope": self.scope, "ident": self.get_ident(request)}
 
 
 class RoutePlanView(APIView):
@@ -23,13 +36,15 @@ class RoutePlanView(APIView):
     """
 
     serializer_class = RouteRequestSerializer
+    throttle_classes = [RoutePlanRateThrottle]
 
     def post(self, request):
         t0 = time.perf_counter()
         serializer = RouteRequestSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
-        result = plan_route(data["start"], data["finish"], corridor_miles=data.get("corridor_miles"))
+        result = plan_route(data["start"], data["finish"], corridor_miles=data.get("corridor_miles"),
+                            min_location_confidence=data["min_location_confidence"])
 
         detail_url = request.build_absolute_uri(reverse("route-plan-detail", args=[result.plan.id]))
         body = {

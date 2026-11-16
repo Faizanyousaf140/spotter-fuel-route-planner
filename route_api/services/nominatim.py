@@ -15,6 +15,8 @@ from dataclasses import dataclass
 
 import requests
 
+from .http_utils import DeadlineExceeded, ResponseTooLarge, read_with_deadline
+
 logger = logging.getLogger(__name__)
 
 PLACE_CATEGORIES = {"place", "boundary"}
@@ -58,8 +60,11 @@ class NominatimClient:
                     params=params,
                     headers={"User-Agent": self.user_agent},
                     timeout=self.timeout,
+                    stream=True,
                 )
-            except requests.RequestException as exc:
+                # Overall deadline: a trickling response cannot hold the request open.
+                response = read_with_deadline(response, time.monotonic() + 2 * self.timeout, 2 * 1024 * 1024)
+            except (requests.RequestException, DeadlineExceeded, ResponseTooLarge) as exc:
                 raise GeocoderUnavailable(f"Geocoder request failed: {exc}") from exc
             finally:
                 NominatimClient._last_request_at = time.monotonic()

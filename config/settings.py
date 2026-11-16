@@ -95,6 +95,13 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": os.environ.get("SQLITE_PATH", str(BASE_DIR / "db.sqlite3")),
+        # Concurrent requests write RoutePlan rows: WAL lets reads continue during a write,
+        # IMMEDIATE transactions avoid "database is locked" upgrade deadlocks.
+        "OPTIONS": {
+            "timeout": 20,
+            "transaction_mode": "IMMEDIATE",
+            "init_command": "PRAGMA journal_mode=WAL; PRAGMA synchronous=NORMAL;",
+        },
     }
 }
 
@@ -131,6 +138,8 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": ["rest_framework.permissions.AllowAny"],
     "UNAUTHENTICATED_USER": None,
     "EXCEPTION_HANDLER": "route_api.exceptions.api_exception_handler",
+    # Identify clients by REMOTE_ADDR only; a spoofed X-Forwarded-For cannot bypass the rate limit.
+    "NUM_PROXIES": 0,
 }
 
 SECURE_CONTENT_TYPE_NOSNIFF = True
@@ -158,7 +167,10 @@ FUEL_PLANNER = {
     "ORS_BASE_URL": os.environ.get("ORS_BASE_URL", "https://api.heigit.org/openrouteservice").rstrip("/"),
     "ORS_API_KEY": os.environ.get("ORS_API_KEY", ""),
     "ROUTING_CONNECT_TIMEOUT": env_float("ROUTING_CONNECT_TIMEOUT", 5.0),
-    "ROUTING_READ_TIMEOUT": env_float("ROUTING_READ_TIMEOUT", 25.0),
+    "ROUTING_READ_TIMEOUT": env_float("ROUTING_READ_TIMEOUT", 15.0),
+    # Hard limit on a whole provider call (connect + full body). requests' own timeouts
+    # do not bound a server that trickles its response.
+    "ROUTING_TOTAL_TIMEOUT": env_float("ROUTING_TOTAL_TIMEOUT", 30.0),
     # Minimum seconds between routing calls per process (OSRM demo policy: 1 req/s).
     "ROUTING_MIN_INTERVAL_SECONDS": env_float("ROUTING_MIN_INTERVAL_SECONDS", 1.0),
     # Douglas-Peucker tolerance (degrees) for the geometry returned to clients.
@@ -174,6 +186,9 @@ FUEL_PLANNER = {
         "HTTP_USER_AGENT", "spotter-fuel-route-planner/1.0 (Django coding assessment)"
     ),
     "GEOCODE_CACHE_SECONDS": env_int("GEOCODE_CACHE_SECONDS", 60 * 60 * 24 * 30),
+    # Per-client limit on POST /api/v1/route/ (protects the free routing/geocoding services).
+    # DRF rate syntax, e.g. "60/min"; empty disables.
+    "ROUTE_RATE_LIMIT": os.environ.get("ROUTE_RATE_LIMIT", "60/min"),
     "PLACES_REFERENCE_PATH": BASE_DIR / "data" / "reference" / "us_places.csv",
 }
 
