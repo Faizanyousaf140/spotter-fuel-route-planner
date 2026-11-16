@@ -146,10 +146,10 @@ class PlaceIndex:
         rank = lambda p: (p.kind != "place", not p.incorporated, -p.land_sqmi)  # noqa: E731
         for bucket in (*self._exact.values(), *self._alias.values()):
             bucket.sort(key=rank)
-        incorporated_places = [p for p in places if p.kind == "place"]
-        self._nearest_places = incorporated_places
-        self._nearest_lats = np.array([p.lat for p in incorporated_places], dtype=float)
-        self._nearest_lons = np.array([p.lon for p in incorporated_places], dtype=float)
+        nearest_candidates = [p for p in places if p.kind == "place"]
+        self._nearest_places = nearest_candidates
+        self._nearest_lats = np.array([p.lat for p in nearest_candidates], dtype=float)
+        self._nearest_lons = np.array([p.lon for p in nearest_candidates], dtype=float)
 
     @classmethod
     def from_csv(cls, path: Path) -> "PlaceIndex":
