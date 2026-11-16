@@ -55,7 +55,7 @@ python manage.py runserver
 
 Then:
 
-* **Demo form:** <http://127.0.0.1:8000/>. Enter two cities; it opens the saved map.
+* **Web app:** <http://127.0.0.1:8000/>. Enter two cities or click an example. The trip summary, itinerary and map appear, and the URL becomes a shareable saved-plan link. The divider between the panel and the map can be dragged.
 * **API:** `POST http://127.0.0.1:8000/api/v1/route/`, documented below.
 * **Health check:** <http://127.0.0.1:8000/api/v1/health/>
 
@@ -600,7 +600,7 @@ route_api/
   exceptions.py             consistent JSON error format
   services/                 planner, geocoding, routing, station index, matching, optimiser, costs, gazetteer
   management/commands/      build_place_reference, build_station_dataset, load_stations
-  templates/route_api/      map.html (Leaflet), demo.html
+  templates/route_api/      app.html: the web app (Leaflet map, trip summary, itinerary; no build step)
 data/
   reference/                Census gazetteer extract and state bounding boxes (public domain)
   processed/                fuel_stations.csv (6,620), ingestion report, rejected records, unmatched cities
