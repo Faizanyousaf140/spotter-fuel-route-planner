@@ -109,7 +109,7 @@ class RouteCacheTests(SimpleTestCase):
         self.assertEqual((first.provider_calls, first.from_cache), (1, False))
         self.assertEqual((second.provider_calls, second.from_cache), (0, True))
         self.assertEqual(len(session.calls), 1)
-        np.testing.assert_allclose(second.coordinates, first.coordinates, atol=1e-6)
+        np.testing.assert_array_equal(second.coordinates, first.coordinates)  # lossless
         self.assertAlmostEqual(second.distance_miles, first.distance_miles)
 
     def test_failures_are_not_cached(self):

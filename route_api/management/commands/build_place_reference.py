@@ -20,7 +20,7 @@ import requests
 from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 
-from route_api.services.gazetteer import US_STATES, clean_text
+from route_api.services.gazetteer import US_STATES, census_name_aliases, clean_text
 
 CENSUS_URL = "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/{year}_Gazetteer/{year}_Gaz_{layer}_national.zip"
 LAYERS = ("place", "cousubs")
@@ -52,7 +52,10 @@ class Command(BaseCommand):
             rows.extend(layer_rows)
 
         places_path = out_dir / "us_places.csv"
-        fields = ["state", "name", "kind", "incorporated", "land_sqmi", "lat", "lon"]
+        fields = ["state", "name", "kind", "incorporated", "land_sqmi", "lat", "lon", "name_key", "alias_keys"]
+        for row in rows:  # precompute lookup keys so loading the index needs no normalisation
+            primary, aliases = census_name_aliases(row["name"])
+            row["name_key"], row["alias_keys"] = primary, "|".join(aliases)
         with open(places_path, "w", newline="", encoding="utf-8") as handle:
             writer = csv.DictWriter(handle, fieldnames=fields)
             writer.writeheader()

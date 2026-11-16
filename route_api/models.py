@@ -1,3 +1,5 @@
+import uuid
+
 from django.db import models
 
 
@@ -36,3 +38,24 @@ class FuelStation(models.Model):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.city}, {self.state}) ${self.price}"
+
+
+class RoutePlan(models.Model):
+    """
+    A computed route + fuel plan, stored so that ``/api/v1/route/<id>/`` and the
+    saved map page keep working across restarts and worker processes.
+    """
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+    start_query = models.CharField(max_length=255)
+    finish_query = models.CharField(max_length=255)
+    route_distance_miles = models.FloatField()
+    total_fuel_cost = models.DecimalField(max_digits=10, decimal_places=2)
+    response = models.JSONField(help_text="The full API response for this plan")
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.start_query} -> {self.finish_query} (${self.total_fuel_cost})"

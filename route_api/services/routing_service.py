@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import threading
 import time
+import zlib
 from dataclasses import dataclass
 
 import numpy as np
@@ -22,11 +24,11 @@ from django.conf import settings
 from django.core.cache import cache
 
 from .errors import RouteNotFound, RoutingProviderError, RoutingTimeout, RoutingUnavailable
-from .geo import METERS_PER_MILE, decode_polyline, encode_polyline
+from .geo import METERS_PER_MILE
 
 logger = logging.getLogger(__name__)
 
-CACHE_VERSION = "v1"
+CACHE_VERSION = "v2"
 CACHE_PRECISION = 5  # ~1 m; coordinates are rounded to this many decimals for the cache key
 
 
@@ -44,6 +46,10 @@ class RouteResult:
 class RoutingProvider:
     name = "base"
 
+    # Process-wide spacing between provider calls (OSRM demo server: max 1 req/s).
+    _spacing_lock = threading.Lock()
+    _last_call_at = 0.0
+
     def __init__(self, cfg: dict, session: requests.Session | None = None):
         self.cfg = cfg
         self.session = session or requests.Session()
@@ -53,7 +59,18 @@ class RoutingProvider:
     def route(self, start: tuple[float, float], finish: tuple[float, float]) -> RouteResult:
         raise NotImplementedError
 
+    def _respect_min_interval(self) -> None:
+        interval = float(self.cfg.get("ROUTING_MIN_INTERVAL_SECONDS") or 0)
+        if interval <= 0:
+            return
+        with RoutingProvider._spacing_lock:
+            wait = RoutingProvider._last_call_at + interval - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+            RoutingProvider._last_call_at = time.monotonic()
+
     def _send(self, method: str, url: str, **kwargs) -> requests.Response:
+        self._respect_min_interval()
         try:
             headers = self.headers | kwargs.pop("headers", {})
             return self.session.request(method, url, timeout=self.timeout, headers=headers, **kwargs)
@@ -181,7 +198,7 @@ def get_route(start: tuple[float, float], finish: tuple[float, float], provider:
     key = route_cache_key(provider.name, start, finish)
     cached = cache.get(key)
     if cached:
-        coords = np.asarray(decode_polyline(cached["polyline6"], precision=6), dtype=float)
+        coords = np.frombuffer(zlib.decompress(cached["coords"]), dtype="<f8").reshape(-1, 2)
         return RouteResult(cached["distance_miles"], cached["duration_seconds"], coords,
                            provider.name, from_cache=True, provider_calls=0)
 
@@ -196,6 +213,7 @@ def get_route(start: tuple[float, float], finish: tuple[float, float], provider:
     cache.set(key, {
         "distance_miles": result.distance_miles,
         "duration_seconds": result.duration_seconds,
-        "polyline6": encode_polyline(result.coordinates.tolist(), precision=6),
+        # Raw float64 [lat, lon] pairs, zlib-compressed: lossless and fast to load.
+        "coords": zlib.compress(np.ascontiguousarray(result.coordinates, dtype="<f8").tobytes(), 1),
     })  # default timeout from CACHES (ROUTE_CACHE_SECONDS)
     return result

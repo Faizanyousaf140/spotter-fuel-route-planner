@@ -75,6 +75,7 @@ class Command(BaseCommand):
         report["stations_dropped_city_not_found"] = len(geo_rejects)
         if fallback:
             report["fallback_geocoder_requests_this_run"] = self.requests_made
+            report["fallback_geocoder_cached_answers"] = self.cache_size()
 
         bounds = ds.load_state_bounds(opts["reference_dir"] / "us_state_bounds.csv")
         stations, out_of_bounds = ds.check_state_bounds(stations, bounds)
@@ -135,6 +136,7 @@ class Command(BaseCommand):
                 self.stdout.write(f"  fallback {city}, {state}: {'found' if hit else 'not found'}")
             return (hit["lat"], hit["lon"], hit["label"]) if hit else None
 
+        self.cache_size = lambda: len(cache)
         return lookup
 
     @staticmethod

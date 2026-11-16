@@ -4,10 +4,10 @@ Minimum-cost refuelling along a fixed route (exact dynamic programme).
 Model (all fuel quantities in *miles of range*; gallons = miles / mpg):
   * Capacity U = range_miles (500). The vehicle starts with F0 (default U).
   * Candidate station i: mile marker m_i, off-route distance o_i, price c_i ($/gal).
-  * Stops are visited in increasing (mile marker, off-route distance) order:
-    stations whose nearest route point coincides (common at mile 0 and at the
-    destination) are visited nearest-to-the-route first. A leg from stop i to
-    stop j uses
+  * Stops are made in route order (no backtracking along the route). Stations
+    whose mile markers are equal (common at mile 0 and at the destination,
+    where several stations project onto the same route point) may be visited in
+    any order, and revisited. A leg from stop i to stop j uses
         d(i, j) = o_i + (m_j - m_i) + o_j
     (leave i back to the route, drive along it, detour to j). The start and the
     destination have o = 0. The o values are ESTIMATES (city-level coordinates).
@@ -26,9 +26,12 @@ g miles of fuel) is then
                    (U - g)*p_u + min_{v pricier} C(v, U - d(u,v)) )
 with p_u = c_u / mpg (cost per mile). It is computed backwards over stations
 sorted by mile marker. Using suffix minima, each C(u, .) is a function
-evaluated in O(log k).
-Total time O(n k log k), where n = candidate stations and k = stations within
-range of a station. Memory O(n k).
+evaluated in O(log k). Stations sharing a mile marker form a group whose
+functions depend on each other; each group is relaxed until its values stop
+improving, which covers every visiting order (including revisits) inside it.
+Total time O(n k log k) (times the number of relaxation passes for the rare
+same-mile groups), where
+n = candidate stations and k = stations within range of a station. Memory O(n k).
 
 Exactness is checked in tests/test_fuel_optimizer.py against an independent
 exhaustive solver on randomised small instances.
@@ -45,6 +48,7 @@ from .errors import NoFeasiblePlan
 
 EPS = 1e-9
 DESTINATION = -1
+MAX_GROUP_PASSES = 100
 
 DECISION_REACH_CHEAPER = "reach_cheaper_station"
 DECISION_REACH_EQUAL = "reach_equal_price_station"
@@ -161,11 +165,14 @@ def optimize_fuel_plan(
                 best, decision, nxt = fill, DECISION_FILL_UP, b_arg[u]
         return best, decision, nxt
 
-    for u in range(n - 1, -1, -1):
-        reach_limit = miles[u] + U - offs[u]
-        hi = bisect_right(miles, reach_limit + EPS)
+    def build(u: int, group_start: int) -> None:
+        """(Re)build the option structures of station u from its current successors."""
+        hi = bisect_right(miles, miles[u] + U - offs[u] + EPS)
         options: list[tuple[float, float, int]] = []
-        for v in range(u + 1, hi):
+        best_b, best_b_arg = math.inf, DESTINATION
+        for v in range(group_start, hi):  # later stations + other stations at the same mile marker
+            if v == u:
+                continue
             d = offs[u] + miles[v] - miles[u] + offs[v]
             if d > U + EPS:
                 continue
@@ -175,13 +182,12 @@ def optimize_fuel_plan(
                     options.append((d, d * ppm[u] + c0, v))
             else:
                 val = evaluate(v, U - d)[0]
-                if val < b_val[u]:
-                    b_val[u], b_arg[u] = val, v
+                if val < best_b:
+                    best_b, best_b_arg = val, v
         d_dest = offs[u] + D - miles[u]
         if d_dest <= U + EPS:
             options.append((d_dest, d_dest * ppm[u], DESTINATION))
         options.sort(key=lambda o: o[0])
-        a_dist[u] = [o[0] for o in options]
         vals = [0.0] * len(options)
         args = [DESTINATION] * len(options)
         running, running_arg = math.inf, DESTINATION
@@ -189,8 +195,28 @@ def optimize_fuel_plan(
             if options[k][1] < running:
                 running, running_arg = options[k][1], options[k][2]
             vals[k], args[k] = running, running_arg
-        a_val[u], a_arg[u] = vals, args
+        a_dist[u], a_val[u], a_arg[u] = [o[0] for o in options], vals, args
+        b_val[u], b_arg[u] = best_b, best_b_arg
         c_empty[u] = evaluate(u, 0.0)[0]
+
+    # Backwards over groups of stations sharing a mile marker. Inside a group the
+    # stations may be visited in any order (and revisited), so their value
+    # functions depend on each other: relax the group until nothing improves.
+    # Every hop inside a group burns fuel, so this terminates.
+    group_end = n
+    while group_end > 0:
+        group_start = bisect_left(miles, miles[group_end - 1])
+        if group_end - group_start == 1:  # the common case: a single station at this mile marker
+            build(group_start, group_start)
+        else:
+            members = range(group_end - 1, group_start - 1, -1)
+            for _ in range(MAX_GROUP_PASSES):
+                before = [(c_empty[u], b_val[u], tuple(a_val[u])) for u in members]
+                for u in members:
+                    build(u, group_start)
+                if before == [(c_empty[u], b_val[u], tuple(a_val[u])) for u in members]:
+                    break
+        group_end = group_start
 
     # First stop: any station reachable on the starting fuel.
     best_cost, first, first_g = math.inf, None, 0.0
@@ -229,7 +255,7 @@ def _validate(candidates, D, U, mpg, F0):
 def _prune(candidates, U) -> list[FuelCandidate]:
     """Drop stations that can never be reached and keep only the cheapest of
     stations sharing an identical (mile, off-route) position (visiting a pricier
-    twin can only add detour, so it is dominated). Order: (mile, off-route) ascending."""
+    twin can only add detour, so it is dominated). Sorted by mile marker."""
     best: dict[tuple[float, float], FuelCandidate] = {}
     for c in candidates:
         if c.off_route > U:
@@ -243,7 +269,7 @@ def _prune(candidates, U) -> list[FuelCandidate]:
 def _reconstruct(nodes, first, first_g, evaluate, D, U, F0, mpg) -> list[PlannedStop]:
     stops: list[PlannedStop] = []
     u, g = first, first_g
-    while True:
+    for _ in range(4 * len(nodes) + 4):  # a plan never needs more stops than this
         cost_from_u, decision, nxt = evaluate(u, g)
         if not math.isfinite(cost_from_u):  # pragma: no cover - guarded by the DP value
             raise NoFeasiblePlan("Internal error reconstructing the fuel plan.")
@@ -262,6 +288,7 @@ def _reconstruct(nodes, first, first_g, evaluate, D, U, F0, mpg) -> list[Planned
         if nxt == DESTINATION:
             return _drop_zero_purchase_stops(stops, U, F0)
         u, g = nxt, max(arrival_next, 0.0)
+    raise NoFeasiblePlan("Internal error reconstructing the fuel plan.")  # pragma: no cover
 
 
 def _drop_zero_purchase_stops(stops: list[PlannedStop], U: float, F0: float) -> list[PlannedStop]:
@@ -287,15 +314,17 @@ def _drop_zero_purchase_stops(stops: list[PlannedStop], U: float, F0: float) -> 
 
 def _raise_infeasible(nodes, D, U, F0):
     """Explain where the chain of reachable stations breaks."""
-    reachable = [False] * len(nodes)
-    for v, c in enumerate(nodes):
-        if c.mile + c.off_route <= F0 + EPS:
-            reachable[v] = True
-            continue
-        for w in range(v):
-            if reachable[w] and nodes[w].off_route + c.mile - nodes[w].mile + c.off_route <= U + EPS:
-                reachable[v] = True
-                break
+    reachable = [c.mile + c.off_route <= F0 + EPS for c in nodes]
+    changed = True
+    while changed:  # fixed point (stations at equal mile markers can reach each other)
+        changed = False
+        for v, c in enumerate(nodes):
+            if reachable[v]:
+                continue
+            if any(reachable[w] and nodes[w].mile <= c.mile
+                   and nodes[w].off_route + c.mile - nodes[w].mile + c.off_route <= U + EPS
+                   for w in range(len(nodes))):
+                reachable[v] = changed = True
     last_mile = max([nodes[i].mile for i in range(len(nodes)) if reachable[i]], default=0.0)
     blocked = [nodes[i].mile for i in range(len(nodes)) if not reachable[i] and nodes[i].mile > last_mile]
     gap_to = min(blocked, default=D)

@@ -1,0 +1,1171 @@
+{
+  "info": {
+    "name": "Spotter Fuel Route Planner API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Django REST API: route between two US locations, cost-optimal fuel stops (500-mile range, 10 mpg), total fuel cost and a saved Leaflet map.\n\nSet base_url (default http://127.0.0.1:8000) and start the server (see README). Example responses are real captures from a local run on 2026-11-16. Hosts are replaced with {{base_url}}, and long geometry or stop lists are truncated where marked."
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "plan_id",
+      "value": ""
+    },
+    {
+      "key": "map_url",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "0. Health",
+      "item": [
+        {
+          "name": "Health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Database and station-data status. 503 if no stations are loaded.",
+            "url": {
+              "raw": "{{base_url}}/api/v1/health/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "health",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"stations loaded\", () => pm.expect(pm.response.json().stations_loaded).to.be.above(0));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "1. Successful routes",
+      "item": [
+        {
+          "name": "Short route, no fuel stop (Washington, DC -> New York, NY)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start\": \"Washington, DC\",\n  \"finish\": \"New York, NY\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                ""
+              ]
+            },
+            "description": "225.6 miles: the full starting tank covers the trip. Only starting fuel is burned (22.56 gal), and the rest is reported as fuel remaining.\n\nReal response captured from a local run on 2026-11-16. Example edited only by: route.geometry.coordinates truncated from 226 to 4 points."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test(\"has route, stops, costs, map\", () => { pm.expect(b).to.include.keys(\"plan_id\",\"map_url\",\"route\",\"fuel_stops\",\"fuel_cost\",\"fuel_usage\",\"warnings\",\"meta\"); pm.expect(b.route.geometry.type).to.eql(\"LineString\"); });",
+                  "pm.test(\"total = starting fuel estimate + purchased during trip\", () => { const c = b.fuel_cost; pm.expect(c.total_fuel_cost).to.be.closeTo(c.starting_fuel_estimate.estimated_value_of_fuel_used + c.purchased_during_trip.cost, 0.011); });",
+                  "pm.test(\"at most one routing API call\", () => pm.expect(b.meta.map_api_calls.routing).to.be.at.most(1));",
+                  "console.log(\"routing calls:\", b.meta.map_api_calls.routing, \"cache hit:\", b.meta.route_cache_hit, \"timings:\", JSON.stringify(b.meta.timings_ms));",
+                  "pm.test(\"no stop needed (< 500 mi)\", () => pm.expect(b.fuel_stops.length).to.eql(0));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Short route, no fuel stop (Washington, DC -> New York, NY) (truncated)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"start\": \"Washington, DC\",\n  \"finish\": \"New York, NY\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/route/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "route",
+                    ""
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"plan_id\": \"6401cdaf-adf6-485a-a1fc-a2fbddfb9312\",\n  \"map_url\": \"{{base_url}}/api/v1/route/6401cdaf-adf6-485a-a1fc-a2fbddfb9312/map/\",\n  \"plan_url\": \"{{base_url}}/api/v1/route/6401cdaf-adf6-485a-a1fc-a2fbddfb9312/\",\n  \"start\": {\n    \"query\": \"Washington, DC\",\n    \"label\": \"Washington, DC\",\n    \"lat\": 38.904243,\n    \"lon\": -77.016524,\n    \"resolved_by\": \"census_gazetteer\"\n  },\n  \"finish\": {\n    \"query\": \"New York, NY\",\n    \"label\": \"New York, NY\",\n    \"lat\": 40.662712,\n    \"lon\": -73.938677,\n    \"resolved_by\": \"census_gazetteer\"\n  },\n  \"route\": {\n    \"provider\": \"osrm\",\n    \"distance_miles\": 225.6,\n    \"duration_hours\": 4.85,\n    \"geometry\": {\n      \"type\": \"LineString\",\n      \"coordinates\": [\n        [\n          -77.01618,\n          38.90424\n        ],\n        [\n          -77.01618,\n          38.90252\n        ],\n        [\n          -76.99845,\n          38.90252\n        ],\n        [\n          -73.93872,\n          40.6631\n        ]\n      ]\n    },\n    \"geometry_points_returned\": 226,\n    \"geometry_points_from_provider\": 4891\n  },\n  \"fuel_stops\": [],\n  \"fuel_cost\": {\n    \"total_fuel_cost\": 83.45,\n    \"purchased_during_trip\": {\n      \"gallons\": 0.0,\n      \"cost\": 0,\n      \"number_of_stops\": 0\n    },\n    \"starting_fuel_estimate\": {\n      \"gallons_in_tank_at_start\": 50.0,\n      \"gallons_used\": 22.56,\n      \"price_per_gallon\": 3.699,\n      \"valuation_method\": \"nearest_corridor_station\",\n      \"estimated_value_of_fuel_used\": 83.45,\n      \"valued_at_station\": {\n        \"opis_id\": 70909,\n        \"name\": \"QUARLES #4408\",\n        \"city\": \"Bladensburg\",\n        \"state\": \"MD\",\n        \"mile_marker\": 6.7,\n        \"distance_from_route_miles\": 0.5\n      }\n    },\n    \"how_total_is_calculated\": \"starting_fuel_estimate.estimated_value_of_fuel_used + purchased_during_trip.cost\",\n    \"currency\": \"USD\"\n  },\n  \"fuel_usage\": {\n    \"route_distance_miles\": 225.6,\n    \"estimated_detour_miles\": 0,\n    \"total_miles_driven\": 225.6,\n    \"fuel_burned_gallons\": 22.56,\n    \"fuel_remaining_at_destination_gallons\": 27.44\n  },\n  \"assumptions\": {\n    \"vehicle_range_miles\": 500.0,\n    \"vehicle_mpg\": 10.0,\n    \"tank_capacity_gallons\": 50.0,\n    \"starting_fuel\": \"Full tank, valued at the price of the corridor station nearest the start.\",\n    \"fuel_remaining_at_destination\": \"Reported but not credited.\",\n    \"station_corridor_miles\": 15.0,\n    \"detour_model\": \"2 x straight-line distance from the route to the station's city-level point.\",\n    \"optimization\": \"Exact minimum refuelling cost over corridor stations (dynamic programme).\"\n  },\n  \"warnings\": [\n    \"Station coordinates are approximate: the price file has no coordinates, so each station is placed at its city's reference point (US Census Gazetteer, or a one-time geocoder lookup). distance_from_route_miles and estimated_detour_miles are straight-line estimates, not road distances; each used station is charged a detour of 2 x its distance from the route (a conservative estimate).\",\n    \"Prices come from the supplied OPIS file (one record per station ID, averaging duplicate price rows); they are not live prices.\"\n  ],\n  \"meta\": {\n    \"map_api_calls\": {\n      \"routing\": 1,\n      \"geocoding\": 0\n    },\n    \"route_cache_hit\": false,\n    \"stations_loaded\": 6620,\n    \"corridor_stations\": 134,\n    \"stations_considered_by_optimizer\": 78,\n    \"timings_ms\": {\n      \"resolve_locations\": 0.3,\n      \"routing\": 3249.1,\n      \"station_index\": 0.0,\n      \"station_matching\": 9.4,\n      \"fuel_optimization\": 1.6,\n      \"response_geometry\": 48.6,\n      \"total_request\": 3329.9\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Multiple fuel stops (New York, NY -> Los Angeles, CA)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start\": \"New York, NY\",\n  \"finish\": \"Los Angeles, CA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                ""
+              ]
+            },
+            "description": "2,810 miles. Sets the plan_id and map_url collection variables for the requests below. Send it twice: the second response shows routing calls = 0 (route cache hit).\n\nReal response captured from a local run on 2026-11-16. Example edited only by: route.geometry.coordinates truncated from 2607 to 4 points; fuel_stops truncated from 9 to 3."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test(\"has route, stops, costs, map\", () => { pm.expect(b).to.include.keys(\"plan_id\",\"map_url\",\"route\",\"fuel_stops\",\"fuel_cost\",\"fuel_usage\",\"warnings\",\"meta\"); pm.expect(b.route.geometry.type).to.eql(\"LineString\"); });",
+                  "pm.test(\"total = starting fuel estimate + purchased during trip\", () => { const c = b.fuel_cost; pm.expect(c.total_fuel_cost).to.be.closeTo(c.starting_fuel_estimate.estimated_value_of_fuel_used + c.purchased_during_trip.cost, 0.011); });",
+                  "pm.test(\"at most one routing API call\", () => pm.expect(b.meta.map_api_calls.routing).to.be.at.most(1));",
+                  "console.log(\"routing calls:\", b.meta.map_api_calls.routing, \"cache hit:\", b.meta.route_cache_hit, \"timings:\", JSON.stringify(b.meta.timings_ms));",
+                  "pm.test(\"several stops\", () => pm.expect(b.fuel_stops.length).to.be.above(3));",
+                  "pm.collectionVariables.set(\"plan_id\", b.plan_id); pm.collectionVariables.set(\"map_url\", b.map_url);"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Multiple fuel stops (New York, NY -> Los Angeles, CA) (truncated)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"start\": \"New York, NY\",\n  \"finish\": \"Los Angeles, CA\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/route/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "route",
+                    ""
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"plan_id\": \"2d0b7fe6-d40e-41fb-9ff8-93c19a8572e6\",\n  \"map_url\": \"{{base_url}}/api/v1/route/2d0b7fe6-d40e-41fb-9ff8-93c19a8572e6/map/\",\n  \"plan_url\": \"{{base_url}}/api/v1/route/2d0b7fe6-d40e-41fb-9ff8-93c19a8572e6/\",\n  \"start\": {\n    \"query\": \"New York, NY\",\n    \"label\": \"New York, NY\",\n    \"lat\": 40.662712,\n    \"lon\": -73.938677,\n    \"resolved_by\": \"census_gazetteer\"\n  },\n  \"finish\": {\n    \"query\": \"Los Angeles, CA\",\n    \"label\": \"Los Angeles, CA\",\n    \"lat\": 34.019394,\n    \"lon\": -118.410825,\n    \"resolved_by\": \"census_gazetteer\"\n  },\n  \"route\": {\n    \"provider\": \"osrm\",\n    \"distance_miles\": 2810.5,\n    \"duration_hours\": 50.31,\n    \"geometry\": {\n      \"type\": \"LineString\",\n      \"coordinates\": [\n        [\n          -73.93872,\n          40.6631\n        ],\n        [\n          -73.94282,\n          40.66285\n        ],\n        [\n          -73.9427,\n          40.66405\n        ],\n        [\n          -118.41035,\n          34.01965\n        ]\n      ]\n    },\n    \"geometry_points_returned\": 2607,\n    \"geometry_points_from_provider\": 35357\n  },\n  \"fuel_stops\": [\n    {\n      \"sequence\": 1,\n      \"opis_id\": 72782,\n      \"name\": \"SHEETZ #791\",\n      \"address\": \"I-76, Exit 57\",\n      \"city\": \"North Jackson\",\n      \"state\": \"OH\",\n      \"location\": {\n        \"lat\": 41.100127,\n        \"lon\": -80.857174,\n        \"precision\": \"city-level (approximate)\"\n      },\n      \"price_per_gallon\": 3.066,\n      \"mile_marker\": 405.8,\n      \"distance_from_route_miles\": 1.4,\n      \"estimated_detour_miles\": 2.8,\n      \"fuel_on_arrival_gallons\": 9.28,\n      \"gallons_purchased\": 36.135,\n      \"fuel_on_departure_gallons\": 45.41,\n      \"cost\": 110.78,\n      \"decision\": \"reach_cheaper_station\",\n      \"reason\": \"Bought only enough to reach CASEYS #3686 (Utica, IL) at mile 857, which is cheaper ($3.042 vs $3.066/gal).\"\n    },\n    {\n      \"sequence\": 2,\n      \"opis_id\": 70744,\n      \"name\": \"CASEYS #3686\",\n      \"address\": \"I-80 EXIT 81\",\n      \"city\": \"Utica\",\n      \"state\": \"IL\",\n      \"location\": {\n        \"lat\": 41.345599,\n        \"lon\": -88.986337,\n        \"precision\": \"city-level (approximate)\"\n      },\n      \"price_per_gallon\": 3.042,\n      \"mile_marker\": 857.0,\n      \"distance_from_route_miles\": 1.5,\n      \"estimated_detour_miles\": 3.1,\n      \"fuel_on_arrival_gallons\": 0.0,\n      \"gallons_purchased\": 24.858,\n      \"fuel_on_departure_gallons\": 24.86,\n      \"cost\": 75.62,\n      \"decision\": \"reach_cheaper_station\",\n      \"reason\": \"Bought only enough to reach KWIK STAR #932 (Altoona, IA) at mile 1103, which is cheaper ($2.959 vs $3.042/gal).\"\n    },\n    {\n      \"sequence\": 3,\n      \"opis_id\": 70333,\n      \"name\": \"KWIK STAR #932\",\n      \"address\": \"I-80, EXIT 143 & CR-S14\",\n      \"city\": \"Altoona\",\n      \"state\": \"IA\",\n      \"location\": {\n        \"lat\": 41.653452,\n        \"lon\": -93.482793,\n        \"precision\": \"city-level (approximate)\"\n      },\n      \"price_per_gallon\": 2.959,\n      \"mile_marker\": 1103.4,\n      \"distance_from_route_miles\": 0.6,\n      \"estimated_detour_miles\": 1.2,\n      \"fuel_on_arrival_gallons\": 0.0,\n      \"gallons_purchased\": 16.119,\n      \"fuel_on_departure_gallons\": 16.12,\n      \"cost\": 47.7,\n      \"decision\": \"reach_cheaper_station\",\n      \"reason\": \"Bought only enough to reach KUM & GO #0370 (Gretna, NE) at mile 1264, which is cheaper ($2.921 vs $2.959/gal).\"\n    }\n  ],\n  \"fuel_cost\": {\n    \"total_fuel_cost\": 875.04,\n    \"purchased_during_trip\": {\n      \"gallons\": 233.979,\n      \"cost\": 713.09,\n      \"number_of_stops\": 9\n    },\n    \"starting_fuel_estimate\": {\n      \"gallons_in_tank_at_start\": 50.0,\n      \"gallons_used\": 50.0,\n      \"price_per_gallon\": 3.239,\n      \"valuation_method\": \"nearest_corridor_station\",\n      \"estimated_value_of_fuel_used\": 161.95,\n      \"valued_at_station\": {\n        \"opis_id\": 72087,\n        \"name\": \"DELTA\",\n        \"city\": \"Jersey City\",\n        \"state\": \"NJ\",\n        \"mile_marker\": 9.1,\n        \"distance_from_route_miles\": 1.8\n      }\n    },\n    \"how_total_is_calculated\": \"starting_fuel_estimate.estimated_value_of_fuel_used + purchased_during_trip.cost\",\n    \"currency\": \"USD\"\n  },\n  \"fuel_usage\": {\n    \"route_distance_miles\": 2810.5,\n    \"estimated_detour_miles\": 29.3,\n    \"total_miles_driven\": 2839.8,\n    \"fuel_burned_gallons\": 283.979,\n    \"fuel_remaining_at_destination_gallons\": 0.0\n  },\n  \"assumptions\": {\n    \"vehicle_range_miles\": 500.0,\n    \"vehicle_mpg\": 10.0,\n    \"tank_capacity_gallons\": 50.0,\n    \"starting_fuel\": \"Full tank, valued at the price of the corridor station nearest the start.\",\n    \"fuel_remaining_at_destination\": \"Reported but not credited.\",\n    \"station_corridor_miles\": 15.0,\n    \"detour_model\": \"2 x straight-line distance from the route to the station's city-level point.\",\n    \"optimization\": \"Exact minimum refuelling cost over corridor stations (dynamic programme).\"\n  },\n  \"warnings\": [\n    \"Station coordinates are approximate: the price file has no coordinates, so each station is placed at its city's reference point (US Census Gazetteer, or a one-time geocoder lookup). distance_from_route_miles and estimated_detour_miles are straight-line estimates, not road distances; each used station is charged a detour of 2 x its distance from the route (a conservative estimate).\",\n    \"Prices come from the supplied OPIS file (one record per station ID, averaging duplicate price rows); they are not live prices.\"\n  ],\n  \"meta\": {\n    \"map_api_calls\": {\n      \"routing\": 1,\n      \"geocoding\": 0\n    },\n    \"route_cache_hit\": false,\n    \"stations_loaded\": 6620,\n    \"corridor_stations\": 523,\n    \"stations_considered_by_optimizer\": 273,\n    \"timings_ms\": {\n      \"resolve_locations\": 4.4,\n      \"routing\": 2928.5,\n      \"station_index\": 0.0,\n      \"station_matching\": 75.0,\n      \"fuel_optimization\": 42.3,\n      \"response_geometry\": 225.8,\n      \"total_request\": 3314.5\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Fuel cost breakdown (Chicago, IL -> Dallas, TX)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start\": \"Chicago, IL\",\n  \"finish\": \"Dallas, TX\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                ""
+              ]
+            },
+            "description": "fuel_cost.purchased_during_trip (money spent at stops) is reported separately from fuel_cost.starting_fuel_estimate (the estimated value of the starting tank).\n\nReal response captured from a local run on 2026-11-16. Example edited only by: route.geometry.coordinates truncated from 596 to 4 points."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test(\"has route, stops, costs, map\", () => { pm.expect(b).to.include.keys(\"plan_id\",\"map_url\",\"route\",\"fuel_stops\",\"fuel_cost\",\"fuel_usage\",\"warnings\",\"meta\"); pm.expect(b.route.geometry.type).to.eql(\"LineString\"); });",
+                  "pm.test(\"total = starting fuel estimate + purchased during trip\", () => { const c = b.fuel_cost; pm.expect(c.total_fuel_cost).to.be.closeTo(c.starting_fuel_estimate.estimated_value_of_fuel_used + c.purchased_during_trip.cost, 0.011); });",
+                  "pm.test(\"at most one routing API call\", () => pm.expect(b.meta.map_api_calls.routing).to.be.at.most(1));",
+                  "console.log(\"routing calls:\", b.meta.map_api_calls.routing, \"cache hit:\", b.meta.route_cache_hit, \"timings:\", JSON.stringify(b.meta.timings_ms));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Fuel cost breakdown (Chicago, IL -> Dallas, TX) (truncated)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"start\": \"Chicago, IL\",\n  \"finish\": \"Dallas, TX\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/route/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "route",
+                    ""
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"plan_id\": \"19563f0f-4563-4fa1-ac7d-362896c80efd\",\n  \"map_url\": \"{{base_url}}/api/v1/route/19563f0f-4563-4fa1-ac7d-362896c80efd/map/\",\n  \"plan_url\": \"{{base_url}}/api/v1/route/19563f0f-4563-4fa1-ac7d-362896c80efd/\",\n  \"start\": {\n    \"query\": \"Chicago, IL\",\n    \"label\": \"Chicago, IL\",\n    \"lat\": 41.837045,\n    \"lon\": -87.684939,\n    \"resolved_by\": \"census_gazetteer\"\n  },\n  \"finish\": {\n    \"query\": \"Dallas, TX\",\n    \"label\": \"Dallas, TX\",\n    \"lat\": 32.793333,\n    \"lon\": -96.766513,\n    \"resolved_by\": \"census_gazetteer\"\n  },\n  \"route\": {\n    \"provider\": \"osrm\",\n    \"distance_miles\": 961.5,\n    \"duration_hours\": 17.04,\n    \"geometry\": {\n      \"type\": \"LineString\",\n      \"coordinates\": [\n        [\n          -87.68488,\n          41.83705\n        ],\n        [\n          -87.68116,\n          41.6918\n        ],\n        [\n          -87.67048,\n          41.69193\n        ],\n        [\n          -96.76642,\n          32.79325\n        ]\n      ]\n    },\n    \"geometry_points_returned\": 596,\n    \"geometry_points_from_provider\": 9539\n  },\n  \"fuel_stops\": [\n    {\n      \"sequence\": 1,\n      \"opis_id\": 67427,\n      \"name\": \"CASEYS #2907\",\n      \"address\": \"I-57 & I-62\",\n      \"city\": \"Charleston\",\n      \"state\": \"MO\",\n      \"location\": {\n        \"lat\": 36.916934,\n        \"lon\": -89.333912,\n        \"precision\": \"city-level (approximate)\"\n      },\n      \"price_per_gallon\": 3.044,\n      \"mile_marker\": 376.5,\n      \"distance_from_route_miles\": 0.2,\n      \"estimated_detour_miles\": 0.4,\n      \"fuel_on_arrival_gallons\": 12.33,\n      \"gallons_purchased\": 7.699,\n      \"fuel_on_departure_gallons\": 20.02,\n      \"cost\": 23.43,\n      \"decision\": \"reach_cheaper_station\",\n      \"reason\": \"Bought only enough to reach PIT STOP (Wheatley, AR) at mile 576, which is cheaper ($2.999 vs $3.044/gal).\"\n    },\n    {\n      \"sequence\": 2,\n      \"opis_id\": 66348,\n      \"name\": \"PIT STOP\",\n      \"address\": \"I-40 EXIT 221\",\n      \"city\": \"Wheatley\",\n      \"state\": \"AR\",\n      \"location\": {\n        \"lat\": 34.921186,\n        \"lon\": -91.106255,\n        \"precision\": \"city-level (approximate)\"\n      },\n      \"price_per_gallon\": 2.999,\n      \"mile_marker\": 576.0,\n      \"distance_from_route_miles\": 0.6,\n      \"estimated_detour_miles\": 1.1,\n      \"fuel_on_arrival_gallons\": 0.0,\n      \"gallons_purchased\": 22.531,\n      \"fuel_on_departure_gallons\": 22.53,\n      \"cost\": 67.57,\n      \"decision\": \"reach_cheaper_station\",\n      \"reason\": \"Bought only enough to reach EXTRA MILE TRUCK STOP (Hooks, TX) at mile 800, which is cheaper ($2.817 vs $2.999/gal).\"\n    },\n    {\n      \"sequence\": 3,\n      \"opis_id\": 68256,\n      \"name\": \"EXTRA MILE TRUCK STOP\",\n      \"address\": \"I-30 EXIT 208\",\n      \"city\": \"Hooks\",\n      \"state\": \"TX\",\n      \"location\": {\n        \"lat\": 33.470695,\n        \"lon\": -94.286542,\n        \"precision\": \"city-level (approximate)\"\n      },\n      \"price_per_gallon\": 2.817,\n      \"mile_marker\": 800.5,\n      \"distance_from_route_miles\": 0.3,\n      \"estimated_detour_miles\": 0.6,\n      \"fuel_on_arrival_gallons\": 0.0,\n      \"gallons_purchased\": 16.128,\n      \"fuel_on_departure_gallons\": 16.13,\n      \"cost\": 45.44,\n      \"decision\": \"reach_destination\",\n      \"reason\": \"Bought only enough fuel to reach the destination; no cheaper option is needed.\"\n    }\n  ],\n  \"fuel_cost\": {\n    \"total_fuel_cost\": 306.39,\n    \"purchased_during_trip\": {\n      \"gallons\": 46.358,\n      \"cost\": 136.44,\n      \"number_of_stops\": 3\n    },\n    \"starting_fuel_estimate\": {\n      \"gallons_in_tank_at_start\": 50.0,\n      \"gallons_used\": 50.0,\n      \"price_per_gallon\": 3.399,\n      \"valuation_method\": \"nearest_corridor_station\",\n      \"estimated_value_of_fuel_used\": 169.95,\n      \"valued_at_station\": {\n        \"opis_id\": 73127,\n        \"name\": \"Gas N Wash\",\n        \"city\": \"Chicago\",\n        \"state\": \"IL\",\n        \"mile_marker\": 0.0,\n        \"distance_from_route_miles\": 0.0\n      }\n    },\n    \"how_total_is_calculated\": \"starting_fuel_estimate.estimated_value_of_fuel_used + purchased_during_trip.cost\",\n    \"currency\": \"USD\"\n  },\n  \"fuel_usage\": {\n    \"route_distance_miles\": 961.5,\n    \"estimated_detour_miles\": 2.1,\n    \"total_miles_driven\": 963.6,\n    \"fuel_burned_gallons\": 96.358,\n    \"fuel_remaining_at_destination_gallons\": 0.0\n  },\n  \"assumptions\": {\n    \"vehicle_range_miles\": 500.0,\n    \"vehicle_mpg\": 10.0,\n    \"tank_capacity_gallons\": 50.0,\n    \"starting_fuel\": \"Full tank, valued at the price of the corridor station nearest the start.\",\n    \"fuel_remaining_at_destination\": \"Reported but not credited.\",\n    \"station_corridor_miles\": 15.0,\n    \"detour_model\": \"2 x straight-line distance from the route to the station's city-level point.\",\n    \"optimization\": \"Exact minimum refuelling cost over corridor stations (dynamic programme).\"\n  },\n  \"warnings\": [\n    \"Station coordinates are approximate: the price file has no coordinates, so each station is placed at its city's reference point (US Census Gazetteer, or a one-time geocoder lookup). distance_from_route_miles and estimated_detour_miles are straight-line estimates, not road distances; each used station is charged a detour of 2 x its distance from the route (a conservative estimate).\",\n    \"Prices come from the supplied OPIS file (one record per station ID, averaging duplicate price rows); they are not live prices.\"\n  ],\n  \"meta\": {\n    \"map_api_calls\": {\n      \"routing\": 1,\n      \"geocoding\": 0\n    },\n    \"route_cache_hit\": false,\n    \"stations_loaded\": 6620,\n    \"corridor_stations\": 228,\n    \"stations_considered_by_optimizer\": 108,\n    \"timings_ms\": {\n      \"resolve_locations\": 0.2,\n      \"routing\": 2795.7,\n      \"station_index\": 0.0,\n      \"station_matching\": 54.4,\n      \"fuel_optimization\": 19.3,\n      \"response_geometry\": 574.3,\n      \"total_request\": 3470.4\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Coordinates input (\"lat,lng\" -> \"City, ST\")",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start\": \"39.7392,-104.9903\",\n  \"finish\": \"Salt Lake City, UT\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                ""
+              ]
+            },
+            "description": "Start given as \"lat,lng\" (downtown Denver). An object {\"lat\": .., \"lon\": ..} is also accepted.\n\nReal response captured from a local run on 2026-11-16. Example edited only by: route.geometry.coordinates truncated from 502 to 4 points."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test(\"has route, stops, costs, map\", () => { pm.expect(b).to.include.keys(\"plan_id\",\"map_url\",\"route\",\"fuel_stops\",\"fuel_cost\",\"fuel_usage\",\"warnings\",\"meta\"); pm.expect(b.route.geometry.type).to.eql(\"LineString\"); });",
+                  "pm.test(\"total = starting fuel estimate + purchased during trip\", () => { const c = b.fuel_cost; pm.expect(c.total_fuel_cost).to.be.closeTo(c.starting_fuel_estimate.estimated_value_of_fuel_used + c.purchased_during_trip.cost, 0.011); });",
+                  "pm.test(\"at most one routing API call\", () => pm.expect(b.meta.map_api_calls.routing).to.be.at.most(1));",
+                  "console.log(\"routing calls:\", b.meta.map_api_calls.routing, \"cache hit:\", b.meta.route_cache_hit, \"timings:\", JSON.stringify(b.meta.timings_ms));"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Coordinates input (\"lat,lng\" -> \"City, ST\") (truncated)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"start\": \"39.7392,-104.9903\",\n  \"finish\": \"Salt Lake City, UT\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/route/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "route",
+                    ""
+                  ]
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"plan_id\": \"5703cdec-db89-4acb-9378-dfc8014b527f\",\n  \"map_url\": \"{{base_url}}/api/v1/route/5703cdec-db89-4acb-9378-dfc8014b527f/map/\",\n  \"plan_url\": \"{{base_url}}/api/v1/route/5703cdec-db89-4acb-9378-dfc8014b527f/\",\n  \"start\": {\n    \"query\": \"39.7392,-104.9903\",\n    \"label\": \"39.73920,-104.99030 (near Glendale city, CO)\",\n    \"lat\": 39.7392,\n    \"lon\": -104.9903,\n    \"resolved_by\": \"coordinates\"\n  },\n  \"finish\": {\n    \"query\": \"Salt Lake City, UT\",\n    \"label\": \"Salt Lake City, UT\",\n    \"lat\": 40.775366,\n    \"lon\": -111.927266,\n    \"resolved_by\": \"census_gazetteer\"\n  },\n  \"route\": {\n    \"provider\": \"osrm\",\n    \"distance_miles\": 523.3,\n    \"duration_hours\": 9.06,\n    \"geometry\": {\n      \"type\": \"LineString\",\n      \"coordinates\": [\n        [\n          -104.99029,\n          39.73847\n        ],\n        [\n          -104.99026,\n          39.73685\n        ],\n        [\n          -104.99573,\n          39.73686\n        ],\n        [\n          -111.92726,\n          40.77536\n        ]\n      ]\n    },\n    \"geometry_points_returned\": 502,\n    \"geometry_points_from_provider\": 5568\n  },\n  \"fuel_stops\": [\n    {\n      \"sequence\": 1,\n      \"opis_id\": 4700,\n      \"name\": \"A C TRUCKSTOP\",\n      \"address\": \"I-80, EXIT 290\",\n      \"city\": \"Laramie\",\n      \"state\": \"WY\",\n      \"location\": {\n        \"lat\": 41.31181,\n        \"lon\": -105.606472,\n        \"precision\": \"city-level (approximate)\"\n      },\n      \"price_per_gallon\": 3.079,\n      \"mile_marker\": 132.1,\n      \"distance_from_route_miles\": 0.4,\n      \"estimated_detour_miles\": 0.8,\n      \"fuel_on_arrival_gallons\": 36.75,\n      \"gallons_purchased\": 2.412,\n      \"fuel_on_departure_gallons\": 39.16,\n      \"cost\": 7.43,\n      \"decision\": \"reach_destination\",\n      \"reason\": \"Bought only enough fuel to reach the destination; no cheaper option is needed.\"\n    }\n  ],\n  \"fuel_cost\": {\n    \"total_fuel_cost\": 178.21,\n    \"purchased_during_trip\": {\n      \"gallons\": 2.412,\n      \"cost\": 7.43,\n      \"number_of_stops\": 1\n    },\n    \"starting_fuel_estimate\": {\n      \"gallons_in_tank_at_start\": 50.0,\n      \"gallons_used\": 50.0,\n      \"price_per_gallon\": 3.416,\n      \"valuation_method\": \"nearest_corridor_station\",\n      \"estimated_value_of_fuel_used\": 170.78,\n      \"valued_at_station\": {\n        \"opis_id\": 7552,\n        \"name\": \"TA DENVER WEST TRAVEL CENTER\",\n        \"city\": \"Wheat Ridge\",\n        \"state\": \"CO\",\n        \"mile_marker\": 2.0,\n        \"distance_from_route_miles\": 5.1\n      }\n    },\n    \"how_total_is_calculated\": \"starting_fuel_estimate.estimated_value_of_fuel_used + purchased_during_trip.cost\",\n    \"currency\": \"USD\"\n  },\n  \"fuel_usage\": {\n    \"route_distance_miles\": 523.3,\n    \"estimated_detour_miles\": 0.8,\n    \"total_miles_driven\": 524.1,\n    \"fuel_burned_gallons\": 52.412,\n    \"fuel_remaining_at_destination_gallons\": 0.0\n  },\n  \"assumptions\": {\n    \"vehicle_range_miles\": 500.0,\n    \"vehicle_mpg\": 10.0,\n    \"tank_capacity_gallons\": 50.0,\n    \"starting_fuel\": \"Full tank, valued at the price of the corridor station nearest the start.\",\n    \"fuel_remaining_at_destination\": \"Reported but not credited.\",\n    \"station_corridor_miles\": 15.0,\n    \"detour_model\": \"2 x straight-line distance from the route to the station's city-level point.\",\n    \"optimization\": \"Exact minimum refuelling cost over corridor stations (dynamic programme).\"\n  },\n  \"warnings\": [\n    \"Station coordinates are approximate: the price file has no coordinates, so each station is placed at its city's reference point (US Census Gazetteer, or a one-time geocoder lookup). distance_from_route_miles and estimated_detour_miles are straight-line estimates, not road distances; each used station is charged a detour of 2 x its distance from the route (a conservative estimate).\",\n    \"Prices come from the supplied OPIS file (one record per station ID, averaging duplicate price rows); they are not live prices.\"\n  ],\n  \"meta\": {\n    \"map_api_calls\": {\n      \"routing\": 1,\n      \"geocoding\": 0\n    },\n    \"route_cache_hit\": false,\n    \"stations_loaded\": 6620,\n    \"corridor_stations\": 68,\n    \"stations_considered_by_optimizer\": 33,\n    \"timings_ms\": {\n      \"resolve_locations\": 5.6,\n      \"routing\": 3019.7,\n      \"station_index\": 0.0,\n      \"station_matching\": 3.5,\n      \"fuel_optimization\": 1.7,\n      \"response_geometry\": 50.5,\n      \"total_request\": 3100.6\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Custom corridor width (Seattle, WA -> Miami, FL, 25 mi)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start\": \"Seattle, WA\",\n  \"finish\": \"Miami, FL\",\n  \"corridor_miles\": 25\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                ""
+              ]
+            },
+            "description": "corridor_miles (1-50, default 15): max straight-line miles between a station's city-level point and the route."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"201 Created\", () => pm.response.to.have.status(201));",
+                  "const b = pm.response.json();",
+                  "pm.test(\"has route, stops, costs, map\", () => { pm.expect(b).to.include.keys(\"plan_id\",\"map_url\",\"route\",\"fuel_stops\",\"fuel_cost\",\"fuel_usage\",\"warnings\",\"meta\"); pm.expect(b.route.geometry.type).to.eql(\"LineString\"); });",
+                  "pm.test(\"total = starting fuel estimate + purchased during trip\", () => { const c = b.fuel_cost; pm.expect(c.total_fuel_cost).to.be.closeTo(c.starting_fuel_estimate.estimated_value_of_fuel_used + c.purchased_during_trip.cost, 0.011); });",
+                  "pm.test(\"at most one routing API call\", () => pm.expect(b.meta.map_api_calls.routing).to.be.at.most(1));",
+                  "console.log(\"routing calls:\", b.meta.map_api_calls.routing, \"cache hit:\", b.meta.route_cache_hit, \"timings:\", JSON.stringify(b.meta.timings_ms));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Get saved plan (JSON)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Plans are stored in the database, so this keeps working after a server restart.",
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/{{plan_id}}/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                "{{plan_id}}",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"same plan\", () => pm.expect(pm.response.json().plan_id).to.eql(pm.collectionVariables.get(\"plan_id\")));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        },
+        {
+          "name": "Saved route map (HTML, open in a browser)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "description": "Leaflet + OpenStreetMap map of the saved plan. Open {{map_url}} in a browser to view it.",
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/{{plan_id}}/map/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                "{{plan_id}}",
+                "map",
+                ""
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"200 OK\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Leaflet page\", () => pm.expect(pm.response.text()).to.include(\"leaflet\"));"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "2. Invalid input",
+      "item": [
+        {
+          "name": "Missing finish (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start\": \"Chicago, IL\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                ""
+              ]
+            },
+            "description": "Real response captured from a local run on 2026-11-16."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 invalid_request\", () => { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql(\"invalid_request\"); });"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Missing finish (400)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"start\": \"Chicago, IL\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/route/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "route",
+                    ""
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"invalid_request\",\n    \"message\": \"Request validation failed.\",\n    \"details\": {\n      \"finish\": [\n        \"This field is required.\"\n      ]\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Location outside the USA (422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start\": \"Toronto, ON\",\n  \"finish\": \"Chicago, IL\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                ""
+              ]
+            },
+            "description": "Real response captured from a local run on 2026-11-16."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 location_outside_usa\", () => { pm.response.to.have.status(422); pm.expect(pm.response.json().error.code).to.eql(\"location_outside_usa\"); });"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Location outside the USA (422)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"start\": \"Toronto, ON\",\n  \"finish\": \"Chicago, IL\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/route/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "route",
+                    ""
+                  ]
+                }
+              },
+              "status": "Unprocessable Content",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"location_outside_usa\",\n    \"message\": \"start 'Toronto, ON' is outside the USA. Only US locations are supported.\",\n    \"details\": {}\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Invalid coordinates (400)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start\": {\n    \"lat\": 95,\n    \"lon\": -74\n  },\n  \"finish\": \"Dallas, TX\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                ""
+              ]
+            },
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"400 invalid_request\", () => { pm.response.to.have.status(400); pm.expect(pm.response.json().error.code).to.eql(\"invalid_request\"); });"
+                ]
+              }
+            }
+          ],
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "3. Impossible routes",
+      "item": [
+        {
+          "name": "No drivable route (Los Angeles -> Honolulu, 422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start\": \"Los Angeles, CA\",\n  \"finish\": \"Honolulu, HI\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                ""
+              ]
+            },
+            "description": "Real response captured from a local run on 2026-11-16."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 route_not_found\", () => { pm.response.to.have.status(422); pm.expect(pm.response.json().error.code).to.eql(\"route_not_found\"); });"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "No drivable route (Los Angeles -> Honolulu, 422)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"start\": \"Los Angeles, CA\",\n  \"finish\": \"Honolulu, HI\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/route/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "route",
+                    ""
+                  ]
+                }
+              },
+              "status": "Unprocessable Content",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"route_not_found\",\n    \"message\": \"No drivable route was found between the start and finish.\",\n    \"details\": {\n      \"provider_code\": \"NoRoute\",\n      \"provider_message\": \"Impossible route between points\"\n    }\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "No feasible fuel plan (Anchorage -> Seattle, 422)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start\": \"Anchorage, AK\",\n  \"finish\": \"Seattle, WA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                ""
+              ]
+            },
+            "description": "The route runs through Canada. The dataset has no Alaska stations and Canadian stations were excluded, so the first usable station is at mile 2,178.5. That is more than 500 miles.\n\nReal response captured from a local run on 2026-11-16."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"422 no_feasible_fuel_plan\", () => { pm.response.to.have.status(422); pm.expect(pm.response.json().error.code).to.eql(\"no_feasible_fuel_plan\"); });"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "No feasible fuel plan (Anchorage -> Seattle, 422)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"start\": \"Anchorage, AK\",\n  \"finish\": \"Seattle, WA\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/route/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "route",
+                    ""
+                  ]
+                }
+              },
+              "status": "Unprocessable Content",
+              "code": 422,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"no_feasible_fuel_plan\",\n    \"message\": \"No fuel plan can complete this 2268.4-mile route with a 500-mile range: there is no usable fuel station between mile 0.0 and mile 2178.5 (2178.5 miles, including estimated detours).\",\n    \"details\": {\n      \"gap_from_mile\": 0.0,\n      \"gap_to_mile\": 2178.5,\n      \"range_miles\": 500.0,\n      \"start_fuel_miles\": 500.0,\n      \"route_distance_miles\": 2268.4,\n      \"corridor_miles\": 15.0,\n      \"corridor_stations\": 7,\n      \"hint\": \"Try a larger corridor_miles (max 50) or different endpoints.\"\n    }\n  }\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. Provider failures (start the server with a broken OSRM_BASE_URL)",
+      "description": "These need a server started with an unreachable routing provider and a route that is not cached, e.g.\n\n    OSRM_BASE_URL=http://127.0.0.1:9 python manage.py runserver\n        -> 503 routing_unavailable\n    OSRM_BASE_URL=http://10.255.255.1 ROUTING_CONNECT_TIMEOUT=3 python manage.py runserver\n        -> 504 routing_timeout\n\nThe example responses were captured from exactly those configurations (real responses, not mocked).",
+      "item": [
+        {
+          "name": "Routing provider unreachable (503)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start\": \"Boston, MA\",\n  \"finish\": \"Philadelphia, PA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                ""
+              ]
+            },
+            "description": "Server started with OSRM_BASE_URL=http://127.0.0.1:9.\n\nReal response captured from a local run on 2026-11-16."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"503 routing_unavailable\", () => { pm.response.to.have.status(503); pm.expect(pm.response.json().error.code).to.eql(\"routing_unavailable\"); });"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Routing provider unreachable (503)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"start\": \"Boston, MA\",\n  \"finish\": \"Philadelphia, PA\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/route/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "route",
+                    ""
+                  ]
+                }
+              },
+              "status": "Service Unavailable",
+              "code": 503,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"routing_unavailable\",\n    \"message\": \"Routing provider (osrm) is unreachable.\",\n    \"details\": {}\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Routing provider timeout (504)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"start\": \"Boston, MA\",\n  \"finish\": \"Philadelphia, PA\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/route/",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "route",
+                ""
+              ]
+            },
+            "description": "Server started with OSRM_BASE_URL=http://10.255.255.1 ROUTING_CONNECT_TIMEOUT=3.\n\nReal response captured from a local run on 2026-11-16."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"504 routing_timeout\", () => { pm.response.to.have.status(504); pm.expect(pm.response.json().error.code).to.eql(\"routing_timeout\"); });"
+                ]
+              }
+            }
+          ],
+          "response": [
+            {
+              "name": "Routing provider timeout (504)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"start\": \"Boston, MA\",\n  \"finish\": \"Philadelphia, PA\"\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{base_url}}/api/v1/route/",
+                  "host": [
+                    "{{base_url}}"
+                  ],
+                  "path": [
+                    "api",
+                    "v1",
+                    "route",
+                    ""
+                  ]
+                }
+              },
+              "status": "Gateway Timeout",
+              "code": 504,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "body": "{\n  \"error\": {\n    \"code\": \"routing_timeout\",\n    \"message\": \"Routing provider (osrm) timed out.\",\n    \"details\": {}\n  }\n}"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

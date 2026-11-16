@@ -118,6 +118,9 @@ class Place:
     kind: str  # "place" (incorporated place / CDP) or "cousub" (county subdivision)
     incorporated: bool
     land_sqmi: float
+    # Precomputed lookup keys (see census_name_aliases); computed on demand when empty.
+    name_key: str = ""
+    alias_keys: tuple[str, ...] = ()
 
     @property
     def label(self) -> str:
@@ -139,7 +142,10 @@ class PlaceIndex:
         self._exact: dict[tuple[str, str], list[Place]] = {}
         self._alias: dict[tuple[str, str], list[Place]] = {}
         for place in places:
-            primary, aliases = census_name_aliases(place.name)
+            if place.name_key:
+                primary, aliases = place.name_key, place.alias_keys
+            else:
+                primary, aliases = census_name_aliases(place.name)
             self._exact.setdefault((primary, place.state), []).append(place)
             for alias in aliases:
                 self._alias.setdefault((alias, place.state), []).append(place)
@@ -165,6 +171,8 @@ class PlaceIndex:
                         kind=row["kind"],
                         incorporated=row["incorporated"] == "1",
                         land_sqmi=float(row["land_sqmi"] or 0),
+                        name_key=row.get("name_key", ""),
+                        alias_keys=tuple(a for a in row.get("alias_keys", "").split("|") if a),
                     )
                 )
         return cls(places)

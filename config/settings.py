@@ -133,11 +133,12 @@ REST_FRAMEWORK = {
     "EXCEPTION_HANDLER": "route_api.exceptions.api_exception_handler",
 }
 
-if not DEBUG:
-    SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+# HTTPS hardening: enable when served over HTTPS (off by default for local HTTP use).
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+SECURE_SSL_REDIRECT = env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
+SECURE_HSTS_SECONDS = env_int("DJANGO_SECURE_HSTS_SECONDS", 0)
+SESSION_COOKIE_SECURE = CSRF_COOKIE_SECURE = env_bool("DJANGO_SECURE_COOKIES", False)
 
 # --------------------------------------------------------------------------
 # Domain configuration (fuel route planner)
@@ -158,6 +159,10 @@ FUEL_PLANNER = {
     "ORS_API_KEY": os.environ.get("ORS_API_KEY", ""),
     "ROUTING_CONNECT_TIMEOUT": env_float("ROUTING_CONNECT_TIMEOUT", 5.0),
     "ROUTING_READ_TIMEOUT": env_float("ROUTING_READ_TIMEOUT", 25.0),
+    # Minimum seconds between routing calls per process (OSRM demo policy: 1 req/s).
+    "ROUTING_MIN_INTERVAL_SECONDS": env_float("ROUTING_MIN_INTERVAL_SECONDS", 1.0),
+    # Douglas-Peucker tolerance (degrees) for the geometry returned to clients.
+    "RESPONSE_GEOMETRY_TOLERANCE_DEG": env_float("RESPONSE_GEOMETRY_TOLERANCE_DEG", 0.0005),
     # Free-text geocoding fallback (only used when the offline Census
     # gazetteer cannot resolve the input).
     "GEOCODER_FALLBACK_ENABLED": env_bool("GEOCODER_FALLBACK_ENABLED", True),

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Fuel plan: {{ plan.start_query }} &rarr; {{ plan.finish_query }}</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; display: flex; height: 100vh; }
+    #panel { width: 380px; overflow-y: auto; padding: 16px; box-sizing: border-box; border-right: 1px solid #ddd; }
+    #map { flex: 1; }
+    h1 { font-size: 18px; margin: 0 0 4px; }
+    .muted { color: #666; font-size: 12px; }
+    .total { font-size: 26px; font-weight: 600; margin: 12px 0 4px; }
+    table { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+    td { padding: 3px 0; vertical-align: top; }
+    td.num { text-align: right; white-space: nowrap; }
+    .stop { border-top: 1px solid #eee; padding: 8px 0; font-size: 13px; }
+    .stop b { font-size: 14px; }
+    .badge { display: inline-block; min-width: 20px; padding: 1px 6px; border-radius: 10px; background: #1f6feb; color: #fff; text-align: center; font-size: 12px; margin-right: 6px; }
+    .warn { background: #fff8e1; border: 1px solid #f0d58c; padding: 8px; font-size: 12px; margin-top: 12px; }
+    .stop-icon { background: #1f6feb; color: #fff; border-radius: 50%; text-align: center; font: 600 12px/22px system-ui; border: 2px solid #fff; box-shadow: 0 0 2px #333; }
+  </style>
+</head>
+<body>
+<div id="panel">
+  <h1>{{ data.start.label }} &rarr; {{ data.finish.label }}</h1>
+  <div class="muted">Plan {{ plan.id }} &middot; {{ plan.created_at|date:"Y-m-d H:i" }} UTC</div>
+  <div class="total">${{ data.fuel_cost.total_fuel_cost|floatformat:2 }}</div>
+  <div class="muted">Total estimated fuel cost</div>
+  <table>
+    <tr><td>Route distance</td><td class="num">{{ data.route.distance_miles }} mi</td></tr>
+    <tr><td>Driving time (provider)</td><td class="num">{{ data.route.duration_hours }} h</td></tr>
+    <tr><td>Fuel stops</td><td class="num">{{ data.fuel_cost.purchased_during_trip.number_of_stops }}</td></tr>
+    <tr><td>Purchased during trip</td><td class="num">{{ data.fuel_cost.purchased_during_trip.gallons }} gal &middot; ${{ data.fuel_cost.purchased_during_trip.cost|floatformat:2 }}</td></tr>
+    <tr><td>Starting fuel used (estimate)</td><td class="num">{{ data.fuel_cost.starting_fuel_estimate.gallons_used }} gal &middot; ${{ data.fuel_cost.starting_fuel_estimate.estimated_value_of_fuel_used|floatformat:2 }}</td></tr>
+    <tr><td>Estimated detours</td><td class="num">{{ data.fuel_usage.estimated_detour_miles }} mi</td></tr>
+    <tr><td>Fuel left at destination</td><td class="num">{{ data.fuel_usage.fuel_remaining_at_destination_gallons }} gal</td></tr>
+  </table>
+  {% for s in data.fuel_stops %}
+  <div class="stop">
+    <span class="badge">{{ s.sequence }}</span><b>{{ s.name }}</b><br>
+    <span class="muted">{{ s.address }}, {{ s.city }}, {{ s.state }} &middot; mile {{ s.mile_marker }} &middot; ~{{ s.distance_from_route_miles }} mi from route</span><br>
+    ${{ s.price_per_gallon }}/gal &middot; buy <b>{{ s.gallons_purchased }} gal</b> &middot; ${{ s.cost|floatformat:2 }}<br>
+    <span class="muted">{{ s.reason }}</span>
+  </div>
+  {% empty %}
+  <div class="stop">No fuel stop needed: the starting tank covers this trip.</div>
+  {% endfor %}
+  <div class="warn">{% for w in data.warnings %}<p style="margin:0 0 6px">{{ w }}</p>{% endfor %}</div>
+</div>
+<div id="map"></div>
+{{ data|json_script:"plan-data" }}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+<script>
+  const data = JSON.parse(document.getElementById("plan-data").textContent);
+  const map = L.map("map");
+  const line = L.geoJSON(data.route.geometry, { style: { color: "#d63384", weight: 4 } });
+  map.fitBounds(line.getBounds(), { padding: [20, 20] });  // the map needs a view before vector layers are added
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19, attribution: "&copy; OpenStreetMap contributors"
+  }).addTo(map);
+  line.addTo(map);
+  const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  L.circleMarker([data.start.lat, data.start.lon], { radius: 9, color: "#fff", fillColor: "#2da44e", fillOpacity: 1, weight: 2 })
+    .bindPopup("<b>Start</b><br>" + esc(data.start.label)).addTo(map);
+  L.circleMarker([data.finish.lat, data.finish.lon], { radius: 9, color: "#fff", fillColor: "#cf222e", fillOpacity: 1, weight: 2 })
+    .bindPopup("<b>Finish</b><br>" + esc(data.finish.label)).addTo(map);
+  data.fuel_stops.forEach((s) => {
+    const icon = L.divIcon({ className: "stop-icon", html: String(s.sequence), iconSize: [24, 24] });
+    L.marker([s.location.lat, s.location.lon], { icon }).bindPopup(
+      `<b>${s.sequence}. ${esc(s.name)}</b><br>${esc(s.city)}, ${esc(s.state)} &middot; mile ${s.mile_marker}` +
+      `<br>$${s.price_per_gallon}/gal &middot; ${s.gallons_purchased} gal &middot; $${s.cost.toFixed(2)}` +
+      `<br><small>Approximate (city-level) location, ~${s.distance_from_route_miles} mi from route</small>`
+    ).addTo(map);
+  });
+</script>
+</body>
+</html>
