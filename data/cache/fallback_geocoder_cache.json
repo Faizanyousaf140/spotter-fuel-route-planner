@@ -1,0 +1,841 @@
+{
+ "alvada|OH": {
+  "label": "Alvada, Big Spring Township, Seneca County, Ohio, 44802, United States",
+  "lat": 41.0503322,
+  "lon": -83.4018693,
+  "type": "hamlet"
+ },
+ "antioch|TN": {
+  "label": "Antioch, Nashville, Davidson County, Middle Tennessee, Tennessee, 37011, United States",
+  "lat": 36.0600602,
+  "lon": -86.6722192,
+  "type": "hamlet"
+ },
+ "baker|FL": {
+  "label": "Baker, Okaloosa County, Florida, 32536, United States",
+  "lat": 30.7972254,
+  "lon": -86.681691,
+  "type": "hamlet"
+ },
+ "belden|MS": {
+  "label": "Belden, Tupelo, Lee County, Mississippi, 38826, United States",
+  "lat": 34.3103831,
+  "lon": -88.7883888,
+  "type": "hamlet"
+ },
+ "bethany|LA": {
+  "label": "Bethany, Caddo Parish, Louisiana, 71007, United States",
+  "lat": 32.3737683,
+  "lon": -94.0379649,
+  "type": "hamlet"
+ },
+ "blakeslee|PA": {
+  "label": "Blakeslee, Tobyhanna Township, Monroe County, Pennsylvania, 18610, United States",
+  "lat": 41.0925133,
+  "lon": -75.5926681,
+  "type": "village"
+ },
+ "bois d arc|MO": {
+  "label": "Bois D'Arc, Greene County, Missouri, United States",
+  "lat": 37.2564382,
+  "lon": -93.507696,
+  "type": "hamlet"
+ },
+ "breezewood|PA": {
+  "label": "Breezewood, East Providence Township, Bedford County, Pennsylvania, 15533, United States",
+  "lat": 39.9990119,
+  "lon": -78.2404221,
+  "type": "village"
+ },
+ "bridgewater|MA": {
+  "label": "Bridgewater, Plymouth County, Massachusetts, United States",
+  "lat": 41.9902206,
+  "lon": -70.9754432,
+  "type": "town"
+ },
+ "brogue|PA": {
+  "label": "Brogue, Chanceford Township, York County, Pennsylvania, 17309, United States",
+  "lat": 39.8723546,
+  "lon": -76.4846387,
+  "type": "hamlet"
+ },
+ "bronx|NY": {
+  "label": "The Bronx, Bronx County, New York, United States",
+  "lat": 40.8466508,
+  "lon": -73.8785937,
+  "type": "suburb"
+ },
+ "candler|NC": {
+  "label": "Candler, Buncombe County, North Carolina, 28715, United States",
+  "lat": 35.5444359,
+  "lon": -82.6838032,
+  "type": "village"
+ },
+ "casa blanca|NM": {
+  "label": "Casa Blanca, Paraje, Cibola County, New Mexico, 87007, United States",
+  "lat": 35.046318,
+  "lon": -107.4713938,
+  "type": "hamlet"
+ },
+ "castle creek|NY": {
+  "label": "Castle Creek, Town of Chenango, Broome County, New York, 13744, United States",
+  "lat": 42.2275753,
+  "lon": -75.918253,
+  "type": "hamlet"
+ },
+ "cedar grove|TN": {
+  "label": "Cedar Grove, Wilson County, Middle Tennessee, Tennessee, United States",
+  "lat": 36.2517196,
+  "lon": -86.5277724,
+  "type": "hamlet"
+ },
+ "chappell hill|TX": {
+  "label": "Chappell Hill, Washington County, Texas, 77426, United States",
+  "lat": 30.141529,
+  "lon": -96.2567185,
+  "type": "village"
+ },
+ "chesterfield|VA": {
+  "label": "Chesterfield, Chesterfield County, Virginia, 23237, United States",
+  "lat": 37.3777927,
+  "lon": -77.5046698,
+  "type": "town"
+ },
+ "clear brook|VA": {
+  "label": "Clear Brook, Stephenson, Frederick County, Virginia, 22624, United States",
+  "lat": 39.2564912,
+  "lon": -78.096111,
+  "type": "hamlet"
+ },
+ "clines corners|NM": {
+  "label": "Clines Corners, Torrance County, New Mexico, 87070, United States",
+  "lat": 35.0094982,
+  "lon": -105.66918,
+  "type": "hamlet"
+ },
+ "colfax|NC": {
+  "label": "Colfax, Guilford County, North Carolina, 27235, United States",
+  "lat": 36.1126365,
+  "lon": -80.0144842,
+  "type": "hamlet"
+ },
+ "colgate|WI": {
+  "label": "Colgate, Village of Lisbon, Waukesha County, Wisconsin, 53017, United States",
+  "lat": 43.1928301,
+  "lon": -88.2067737,
+  "type": "hamlet"
+ },
+ "cross junction|VA": {
+  "label": "Cross Junction, Frederick County, Virginia, 22625, United States",
+  "lat": 39.3203785,
+  "lon": -78.2933382,
+  "type": "hamlet"
+ },
+ "curtis bay|MD": {
+  "label": "Curtis Bay, Baltimore, Maryland, United States",
+  "lat": 39.2252188,
+  "lon": -76.5900312,
+  "type": "neighbourhood"
+ },
+ "denmark|TN": {
+  "label": "Denmark, Madison County, West Tennessee, Tennessee, 38391, United States",
+  "lat": 35.5328546,
+  "lon": -89.003952,
+  "type": "village"
+ },
+ "diamond|OH": {
+  "label": "Diamond, Palmyra Township, Portage County, Ohio, 44429, United States",
+  "lat": 41.0989463,
+  "lon": -81.022871,
+  "type": "village"
+ },
+ "doswell|VA": {
+  "label": "Doswell, Hanover County, Virginia, 23047, United States",
+  "lat": 37.8601402,
+  "lon": -77.4641492,
+  "type": "village"
+ },
+ "drewryville|VA": {
+  "label": "Drewryville, Southampton County, Virginia, 23844, United States",
+  "lat": 36.7157055,
+  "lon": -77.3063603,
+  "type": "hamlet"
+ },
+ "drums|PA": {
+  "label": "Drums, Butler Township, Luzerne County, Pennsylvania, 18247, United States",
+  "lat": 41.018139,
+  "lon": -75.9949252,
+  "type": "hamlet"
+ },
+ "dumont|CO": {
+  "label": "Dumont, Clear Creek County, Colorado, 80436, United States",
+  "lat": 39.7646887,
+  "lon": -105.600337,
+  "type": "hamlet"
+ },
+ "eastaboga|AL": {
+  "label": "Eastaboga, Calhoun County, Alabama, 36260, United States",
+  "lat": 33.6059367,
+  "lon": -86.0213587,
+  "type": "hamlet"
+ },
+ "edwards|IL": {
+  "label": "Edwards, Peoria County, Illinois, 61528, United States",
+  "lat": 40.7458704,
+  "lon": -89.7442697,
+  "type": "hamlet"
+ },
+ "elizabethport|NJ": {
+  "label": "Elizabethport, Elizabeth, Union County, New Jersey, 07206, United States",
+  "lat": 40.6501031,
+  "lon": -74.1870888,
+  "type": "hamlet"
+ },
+ "ellabell|GA": {
+  "label": "Ellabell, Bryan County, Georgia, United States",
+  "lat": 32.1235368,
+  "lon": -81.4856673,
+  "type": "hamlet"
+ },
+ "ellenwood|GA": {
+  "label": "Ellenwood, Clayton County, Georgia, 30273, United States",
+  "lat": 33.6101096,
+  "lon": -84.287978,
+  "type": "hamlet"
+ },
+ "etters|PA": null,
+ "fackler|AL": {
+  "label": "Fackler, Jackson County, Alabama, United States",
+  "lat": 34.7925827,
+  "lon": -85.9099775,
+  "type": "hamlet"
+ },
+ "feasterville trevose|PA": {
+  "label": "Feasterville-Trevose, Lower Southampton Township, Bucks County, Pennsylvania, 19053, United States",
+  "lat": 40.1484058,
+  "lon": -74.9934733,
+  "type": "village"
+ },
+ "fortson|GA": {
+  "label": "Fortson, Hampton, Henry County, Georgia, 30284, United States",
+  "lat": 33.3778914,
+  "lon": -84.2888119,
+  "type": "hamlet"
+ },
+ "franksville|WI": {
+  "label": "Franksville, Caledonia, Racine County, Wisconsin, 53406, United States",
+  "lat": 42.7600188,
+  "lon": -87.9134133,
+  "type": "hamlet"
+ },
+ "gansevoort|NY": {
+  "label": "Gansevoort, Town of Northumberland, Saratoga County, New York, 12831, United States",
+  "lat": 43.1962051,
+  "lon": -73.6513967,
+  "type": "village"
+ },
+ "gladstone|VA": {
+  "label": "Gladstone, Nelson County, Virginia, United States",
+  "lat": 37.5468094,
+  "lon": -78.8494619,
+  "type": "hamlet"
+ },
+ "glendale|KY": {
+  "label": "Glendale, Hardin County, Kentucky, 42740, United States",
+  "lat": 37.6017278,
+  "lon": -85.9055189,
+  "type": "village"
+ },
+ "glenmont|NY": {
+  "label": "Glenmont, Bethlehem Center, Town of Bethlehem, Albany County, New York, 12077, United States",
+  "lat": 42.604802,
+  "lon": -73.7695658,
+  "type": "hamlet"
+ },
+ "grassy butte|ND": {
+  "label": "Grassy Butte, McKenzie County, North Dakota, 58634, United States",
+  "lat": 47.3925145,
+  "lon": -103.2479655,
+  "type": "hamlet"
+ },
+ "greentown|PA": {
+  "label": "Greentown, Greene Township, Pike County, Pennsylvania, 18426, United States",
+  "lat": 41.321755,
+  "lon": -75.3054585,
+  "type": "hamlet"
+ },
+ "grovertown|IN": {
+  "label": "Grovertown, Starke County, Indiana, United States",
+  "lat": 41.3750434,
+  "lon": -86.5047339,
+  "type": "hamlet"
+ },
+ "gum spring|VA": {
+  "label": "Gum Spring, Louisa County, Virginia, 23065, United States",
+  "lat": 37.7755262,
+  "lon": -77.8968114,
+  "type": "hamlet"
+ },
+ "hamptonville|NC": {
+  "label": "Hamptonville, Yadkin County, North Carolina, 27020, United States",
+  "lat": 36.0984684,
+  "lon": -80.760345,
+  "type": "hamlet"
+ },
+ "hankamer|TX": {
+  "label": "Hankamer, Chambers County, Texas, 77560, United States",
+  "lat": 29.8582755,
+  "lon": -94.6268618,
+  "type": "hamlet"
+ },
+ "harpursville|NY": {
+  "label": "Harpursville, Town of Colesville, Broome County, New York, 13787, United States",
+  "lat": 42.1784124,
+  "lon": -75.6246298,
+  "type": "village"
+ },
+ "hartford|TN": {
+  "label": "Hartford, Cocke County, East Tennessee, Tennessee, 37753, United States",
+  "lat": 35.8167646,
+  "lon": -83.1432066,
+  "type": "suburb"
+ },
+ "heiskell|TN": {
+  "label": "Heiskell, Knox County, East Tennessee, Tennessee, 37849, United States",
+  "lat": 36.081816,
+  "lon": -84.0539821,
+  "type": "suburb"
+ },
+ "henrico|VA": {
+  "label": "Henrico, Laurel, Henrico County, Virginia, 23273, United States",
+  "lat": 37.6294756,
+  "lon": -77.5189032,
+  "type": "suburb"
+ },
+ "hogansburg|NY": {
+  "label": "Hogansburg, Town of Bombay, Franklin County, New York, 13655, United States",
+  "lat": 44.9739364,
+  "lon": -74.6632416,
+  "type": "village"
+ },
+ "hope hull|AL": {
+  "label": "Hope Hull, Montgomery County, Alabama, 36105, United States",
+  "lat": 32.2698632,
+  "lon": -86.3571916,
+  "type": "hamlet"
+ },
+ "hot springs national park|AR": null,
+ "hunt valley|MD": {
+  "label": "Hunt Valley, Cockeysville, Baltimore County, Maryland, 21031, United States",
+  "lat": 39.4922608,
+  "lon": -76.6589528,
+  "type": "suburb"
+ },
+ "hurricane mills|TN": {
+  "label": "Hurricane Mills, Humphreys County, Middle Tennessee, Tennessee, 37078, United States",
+  "lat": 35.9711736,
+  "lon": -87.781969,
+  "type": "hamlet"
+ },
+ "irvington|AL": {
+  "label": "Irvington, Mobile County Commission District 3, Mobile County, Alabama, 36568, United States",
+  "lat": 30.5068623,
+  "lon": -88.2338925,
+  "type": "hamlet"
+ },
+ "irving|NY": {
+  "label": "Irving, Sunset Bay, Town of Hanover, Chautauqua County, New York, 14081, United States",
+  "lat": 42.5675589,
+  "lon": -79.1128169,
+  "type": "hamlet"
+ },
+ "isom|KY": {
+  "label": "Isom, Letcher County, Kentucky, 41824, United States",
+  "lat": 37.1878764,
+  "lon": -82.8987718,
+  "type": "hamlet"
+ },
+ "ivydale|WV": {
+  "label": "Ivydale, Charleston, Kanawha County, West Virginia, 25309, United States",
+  "lat": 38.310097,
+  "lon": -81.7045688,
+  "type": "hamlet"
+ },
+ "jean|NV": {
+  "label": "Jean, Clark County, Nevada, 89026, United States",
+  "lat": 35.7788568,
+  "lon": -115.3243823,
+  "type": "hamlet"
+ },
+ "joelton|TN": {
+  "label": "Joelton, Nashville, Davidson County, Middle Tennessee, Tennessee, 37080, United States",
+  "lat": 36.3131076,
+  "lon": -86.8652772,
+  "type": "hamlet"
+ },
+ "johns island|SC": {
+  "label": "Johns Island, Charleston County, South Carolina, 29455, United States",
+  "lat": 32.7024009,
+  "lon": -80.0481488,
+  "type": "hamlet"
+ },
+ "kearneysville|WV": {
+  "label": "Kearneysville, Jefferson County, West Virginia, 25430, United States",
+  "lat": 39.3881556,
+  "lon": -77.8855516,
+  "type": "hamlet"
+ },
+ "knoxville|AL": {
+  "label": "Knoxville, Oxford, Calhoun County, Alabama, United States",
+  "lat": 33.5917715,
+  "lon": -85.8971885,
+  "type": "hamlet"
+ },
+ "kodak|TN": {
+  "label": "Kodak, Sevier County, East Tennessee, Tennessee, 37764, United States",
+  "lat": 35.9745323,
+  "lon": -83.6268396,
+  "type": "suburb"
+ },
+ "lake ariel|PA": {
+  "label": "Lake Ariel, Lake Township, Wayne County, Pennsylvania, 18436, United States",
+  "lat": 41.4539745,
+  "lon": -75.382681,
+  "type": "hamlet"
+ },
+ "lambsburg|VA": {
+  "label": "Lambsburg, Carroll County, Virginia, 24351, United States",
+  "lat": 36.5854078,
+  "lon": -80.7611817,
+  "type": "hamlet"
+ },
+ "lanexa|VA": {
+  "label": "Lanexa, New Kent County, Virginia, 23089, United States",
+  "lat": 37.4237573,
+  "lon": -76.9010753,
+  "type": "hamlet"
+ },
+ "larsen|WI": {
+  "label": "Larsen, Town of Clayton, Winnebago County, Wisconsin, 54947, United States",
+  "lat": 44.1916501,
+  "lon": -88.623999,
+  "type": "hamlet"
+ },
+ "lawrence|MS": {
+  "label": "Lawrence, Newton County, Mississippi, United States",
+  "lat": 32.3251443,
+  "lon": -89.2328394,
+  "type": "hamlet"
+ },
+ "leesville|SC": {
+  "label": "Leesville, Batesburg-Leesville, Lexington County, South Carolina, 29060, United States",
+  "lat": 33.916532,
+  "lon": -81.5134368,
+  "type": "hamlet"
+ },
+ "lenorah|TX": {
+  "label": "Lenorah, Martin County, Texas, 79749, United States",
+  "lat": 32.30456,
+  "lon": -101.8762483,
+  "type": "village"
+ },
+ "linwood|NC": {
+  "label": "Linwood, Davidson County, North Carolina, United States",
+  "lat": 35.7506938,
+  "lon": -80.3178306,
+  "type": "hamlet"
+ },
+ "longs|SC": {
+  "label": "Longs, Horry County, South Carolina, United States",
+  "lat": 33.9385274,
+  "lon": -78.7330522,
+  "type": "village"
+ },
+ "maxwell|TX": {
+  "label": "Maxwell, Caldwell County, Texas, 78656, United States",
+  "lat": 29.881897,
+  "lon": -97.7956423,
+  "type": "village"
+ },
+ "mc alpin|FL": null,
+ "middlebury center|PA": {
+  "label": "Middlebury Center, Middlebury Township, Tioga County, Pennsylvania, 16935, United States",
+  "lat": 41.8436841,
+  "lon": -77.2744202,
+  "type": "hamlet"
+ },
+ "middlesboro|KY": {
+  "label": "Middlesboro, Bell County, Kentucky, United States",
+  "lat": 36.6072968,
+  "lon": -83.7143317,
+  "type": "city"
+ },
+ "middleton|MI": {
+  "label": "Middleton, Fulton Township, Gratiot County, Michigan, 48856, United States",
+  "lat": 43.1833659,
+  "lon": -84.7088895,
+  "type": "village"
+ },
+ "midland|GA": {
+  "label": "Midland, Columbus, Muscogee County, Georgia, 31820, United States",
+  "lat": 32.5748608,
+  "lon": -84.827152,
+  "type": "neighbourhood"
+ },
+ "milldale|CT": {
+  "label": "Milldale, Southington, Capitol Planning Region, Connecticut, 06467, United States",
+  "lat": 41.5661372,
+  "lon": -72.8999672,
+  "type": "village"
+ },
+ "millersville|MD": {
+  "label": "Millersville, Glen Burnie, Anne Arundel County, Maryland, 21054, United States",
+  "lat": 39.0595542,
+  "lon": -76.6480219,
+  "type": "hamlet"
+ },
+ "milltown|MT": {
+  "label": "Milltown, Missoula County, Montana, 59851, United States",
+  "lat": 46.8712952,
+  "lon": -113.8817192,
+  "type": "hamlet"
+ },
+ "moapa|NV": {
+  "label": "Moapa, Clark County, Nevada, 89025, United States",
+  "lat": 36.6673648,
+  "lon": -114.584977,
+  "type": "village"
+ },
+ "monroeton|PA": {
+  "label": "Monroeton, Monroe, Bradford County, Pennsylvania, 18832, United States",
+  "lat": 41.7125751,
+  "lon": -76.4746649,
+  "type": "hamlet"
+ },
+ "mount nebo|WV": {
+  "label": "Mount Nebo, Preston County, West Virginia, United States",
+  "lat": 39.6023047,
+  "lon": -79.7078303,
+  "type": "hamlet"
+ },
+ "new boston|MI": {
+  "label": "New Boston, Huron Charter Township, Wayne County, Michigan, United States",
+  "lat": 42.1625408,
+  "lon": -83.4029885,
+  "type": "hamlet"
+ },
+ "new hampton|NY": {
+  "label": "New Hampton, Town of Wawayanda, Orange County, New York, 10558, United States",
+  "lat": 41.4098658,
+  "lon": -74.4117435,
+  "type": "village"
+ },
+ "newburg|MD": {
+  "label": "Newburg, Charles County, Maryland, 20664, United States",
+  "lat": 38.3773478,
+  "lon": -76.9533055,
+  "type": "village"
+ },
+ "newport|MI": {
+  "label": "Newport, Berlin Charter Township, Monroe County, Michigan, 48166, United States",
+  "lat": 42.0022672,
+  "lon": -83.3085419,
+  "type": "hamlet"
+ },
+ "newton lower falls|MA": {
+  "label": "Newton Lower Falls, Newton, Middlesex County, Massachusetts, 02462, United States",
+  "lat": 42.3258005,
+  "lon": -71.2563409,
+  "type": "village"
+ },
+ "north billerica|MA": {
+  "label": "North Billerica, Billerica, Middlesex County, Massachusetts, 01862, United States",
+  "lat": 42.5852621,
+  "lon": -71.2877645,
+  "type": "village"
+ },
+ "north jackson|OH": {
+  "label": "North Jackson, Jackson Township, Mahoning County, Ohio, 44451, United States",
+  "lat": 41.1001272,
+  "lon": -80.8571741,
+  "type": "hamlet"
+ },
+ "north oxford|MA": {
+  "label": "North Oxford, Oxford, Worcester County, Massachusetts, 01537, United States",
+  "lat": 42.1500947,
+  "lon": -71.8684054,
+  "type": "hamlet"
+ },
+ "nottingham|MD": {
+  "label": "Nottingham, White Marsh, Baltimore County, Maryland, 21326, United States",
+  "lat": 39.3639964,
+  "lon": -76.4521842,
+  "type": "neighbourhood"
+ },
+ "orla|TX": {
+  "label": "Orla, Reeves County, Texas, 79770, United States",
+  "lat": 31.8250149,
+  "lon": -103.9090099,
+  "type": "village"
+ },
+ "ottawa lake|MI": {
+  "label": "Ottawa Lake, Whiteford Township, Monroe County, Michigan, 49267, United States",
+  "lat": 41.7641517,
+  "lon": -83.7493869,
+  "type": "hamlet"
+ },
+ "pecos|TX": {
+  "label": "Pecos, Reeves County, Texas, 79722, United States",
+  "lat": 31.4254143,
+  "lon": -103.4952894,
+  "type": "town"
+ },
+ "pendleton|KY": {
+  "label": "Pendleton, Henry County, Kentucky, 40055, United States",
+  "lat": 38.4622879,
+  "lon": -85.3035678,
+  "type": "hamlet"
+ },
+ "pioneer|TN": {
+  "label": "Pioneer, Campbell County, East Tennessee, Tennessee, 37847, United States",
+  "lat": 36.4175798,
+  "lon": -84.3140995,
+  "type": "hamlet"
+ },
+ "prairie hill|TX": {
+  "label": "Prairie Hill, Washington County, Texas, 77833, United States",
+  "lat": 30.2488239,
+  "lon": -96.3771874,
+  "type": "hamlet"
+ },
+ "providence forge|VA": {
+  "label": "Providence Forge, New Kent County, Virginia, 23140, United States",
+  "lat": 37.4424264,
+  "lon": -77.0439583,
+  "type": "village"
+ },
+ "pryor|OK": {
+  "label": "Pryor Creek, Mayes County, Oklahoma, United States",
+  "lat": 36.3084275,
+  "lon": -95.3169136,
+  "type": "town"
+ },
+ "pueblo of acoma|NM": null,
+ "quinton|VA": {
+  "label": "Quinton, New Kent County, Virginia, 23124, United States",
+  "lat": 37.5327893,
+  "lon": -77.1154448,
+  "type": "village"
+ },
+ "rabun gap|GA": {
+  "label": "Rabun Gap, Rabun County, Georgia, 30568, United States",
+  "lat": 34.9572143,
+  "lon": -83.3864536,
+  "type": "hamlet"
+ },
+ "raphine|VA": {
+  "label": "Raphine, Rockbridge County, Virginia, 24472, United States",
+  "lat": 37.9373548,
+  "lon": -79.2328102,
+  "type": "hamlet"
+ },
+ "ridgedale|MO": {
+  "label": "Ridgedale, Taney County, Missouri, 65739, United States",
+  "lat": 36.5039535,
+  "lon": -93.2237919,
+  "type": "hamlet"
+ },
+ "rising fawn|GA": {
+  "label": "Rising Fawn, Dade County, Georgia, United States",
+  "lat": 34.7600791,
+  "lon": -85.531076,
+  "type": "hamlet"
+ },
+ "roans prairie|TX": {
+  "label": "Roans Prairie, Grimes County, Texas, 77875, United States",
+  "lat": 30.5836549,
+  "lon": -95.943324,
+  "type": "hamlet"
+ },
+ "rockville|VA": {
+  "label": "Rockville, Hanover County, Virginia, 23146, United States",
+  "lat": 37.7259779,
+  "lon": -77.6783239,
+  "type": "village"
+ },
+ "rosedale|VA": {
+  "label": "Rosedale, Russell County, Virginia, 24280, United States",
+  "lat": 36.9592782,
+  "lon": -81.9312351,
+  "type": "hamlet"
+ },
+ "round o|SC": {
+  "label": "Round O, Colleton County, South Carolina, 29474, United States",
+  "lat": 32.9371151,
+  "lon": -80.5409352,
+  "type": "hamlet"
+ },
+ "ruther glen|VA": {
+  "label": "Ruther Glen, Caroline County, Virginia, 22546, United States",
+  "lat": 37.9408753,
+  "lon": -77.4618647,
+  "type": "village"
+ },
+ "s coffeyville|OK": {
+  "label": "South Coffeyville, Nowata County, Oklahoma, United States",
+  "lat": 36.9945248,
+  "lon": -95.6202552,
+  "type": "town"
+ },
+ "saint croix|IN": {
+  "label": "Saint Croix, Perry County, Indiana, 47576, United States",
+  "lat": 38.2239531,
+  "lon": -86.5863387,
+  "type": "village"
+ },
+ "saint johns|FL": null,
+ "sawyer|MI": {
+  "label": "Sawyer, Chikaming Township, Berrien County, Michigan, 49125, United States",
+  "lat": 41.8853207,
+  "lon": -86.5894666,
+  "type": "hamlet"
+ },
+ "skippers|VA": {
+  "label": "Skippers, Greensville County, Virginia, 23879, United States",
+  "lat": 36.6118169,
+  "lon": -77.5466463,
+  "type": "hamlet"
+ },
+ "smiths creek|MI": {
+  "label": "Smiths Creek, Saint Clair County, Michigan, 48027, United States",
+  "lat": 42.9139187,
+  "lon": -82.6038085,
+  "type": "hamlet"
+ },
+ "summerfield|FL": {
+  "label": "Summerfield, Marion County, Florida, 34492, United States",
+  "lat": 29.0085924,
+  "lon": -82.0348092,
+  "type": "hamlet"
+ },
+ "supply|NC": {
+  "label": "Supply, Brunswick County, North Carolina, United States",
+  "lat": 34.0176717,
+  "lon": -78.267499,
+  "type": "hamlet"
+ },
+ "tafton|PA": {
+  "label": "Tafton, Palmyra Township, Pike County, Pennsylvania, 18464, United States",
+  "lat": 41.404534,
+  "lon": -75.1829535,
+  "type": "hamlet"
+ },
+ "teays|WV": {
+  "label": "Teays, Hickory Hill, Teays Valley, Putnam County, West Virginia, 25526, United States",
+  "lat": 38.4417571,
+  "lon": -81.9529125,
+  "type": "locality"
+ },
+ "tinnie|NM": {
+  "label": "Tinnie, Lincoln County, New Mexico, 88351, United States",
+  "lat": 33.3705561,
+  "lon": -105.2263673,
+  "type": "hamlet"
+ },
+ "tollesboro|KY": {
+  "label": "Tollesboro, Lewis County, Kentucky, 41189, United States",
+  "lat": 38.5595201,
+  "lon": -83.5760258,
+  "type": "hamlet"
+ },
+ "townsend|VA": {
+  "label": "Townsend, Northampton County, Virginia, 23443, United States",
+  "lat": 37.1849815,
+  "lon": -75.958473,
+  "type": "hamlet"
+ },
+ "townville|SC": {
+  "label": "Townville, Anderson County, South Carolina, 29689, United States",
+  "lat": 34.5637137,
+  "lon": -82.8984775,
+  "type": "hamlet"
+ },
+ "troy|VA": {
+  "label": "Troy, Fluvanna County, Virginia, 22974, United States",
+  "lat": 37.9509737,
+  "lon": -78.2463934,
+  "type": "hamlet"
+ },
+ "union grove|NC": {
+  "label": "Union Grove, Iredell County, North Carolina, United States",
+  "lat": 36.0245784,
+  "lon": -80.8661825,
+  "type": "hamlet"
+ },
+ "waddy|KY": {
+  "label": "Waddy, Shelby County, Kentucky, 40076, United States",
+  "lat": 38.1370153,
+  "lon": -85.0743978,
+  "type": "hamlet"
+ },
+ "wall|TX": {
+  "label": "Wall, Tom Green County, Texas, 76957, United States",
+  "lat": 31.3743455,
+  "lon": -100.30366,
+  "type": "village"
+ },
+ "waterfall|PA": {
+  "label": "Waterfall, Taylor Township, Fulton County, Pennsylvania, United States",
+  "lat": 40.1275826,
+  "lon": -78.0627822,
+  "type": "hamlet"
+ },
+ "west chesterfield|NH": {
+  "label": "West Chesterfield, Chesterfield, Cheshire County, New Hampshire, 03466, United States",
+  "lat": 42.9042482,
+  "lon": -72.5156447,
+  "type": "hamlet"
+ },
+ "west coxsackie|NY": {
+  "label": "West Coxsackie, Village of Coxsackie, Town of Coxsackie, Greene County, New York, 12051, United States",
+  "lat": 42.3606399,
+  "lon": -73.8167921,
+  "type": "hamlet"
+ },
+ "west helena|AR": {
+  "label": "West Helena, Helena-West Helena, Phillips County, Arkansas, 72390, United States",
+  "lat": 34.5440124,
+  "lon": -90.6426195,
+  "type": "suburb"
+ },
+ "westover|MD": {
+  "label": "Westover, Somerset County, Maryland, 21890, United States",
+  "lat": 38.1240114,
+  "lon": -75.7063171,
+  "type": "hamlet"
+ },
+ "willow beach|AZ": {
+  "label": "Willow Beach, Mohave County, Arizona, United States",
+  "lat": 35.8697801,
+  "lon": -114.6600654,
+  "type": "hamlet"
+ },
+ "winnabow|NC": {
+  "label": "Winnabow, Brunswick County, North Carolina, 28479, United States",
+  "lat": 34.1493374,
+  "lon": -78.0936046,
+  "type": "hamlet"
+ },
+ "woodford|VA": {
+  "label": "Woodford, Caroline County, Virginia, 22580, United States",
+  "lat": 38.1131886,
+  "lon": -77.4088708,
+  "type": "hamlet"
+ },
+ "youngstown|FL": {
+  "label": "Youngstown, Bay County, Florida, United States",
+  "lat": 30.3643628,
+  "lon": -85.4382568,
+  "type": "hamlet"
+ }
+}

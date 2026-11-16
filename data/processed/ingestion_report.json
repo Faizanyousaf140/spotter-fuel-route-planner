@@ -1,0 +1,42 @@
+{
+  "source_file": "fuel-prices-for-be-assessment.csv",
+  "source_rows_valid": 8151,
+  "source_rows_rejected_invalid": 0,
+  "rows_dropped_non_us": 620,
+  "rows_dropped_exact_duplicate": 26,
+  "us_rows_after_dedupe": 7505,
+  "stations_after_id_merge": 6626,
+  "stations_with_multiple_rows": 567,
+  "stations_with_multiple_prices": 487,
+  "stations_with_name_variants": 227,
+  "geocoding": {
+    "pairs_census_exact_place": 3570,
+    "pairs_census_exact_cousub": 80,
+    "pairs_census_alias_place": 13,
+    "pairs_census_alias_cousub": 1,
+    "pairs_fallback_geocoder": 139,
+    "pairs_unresolved": 5,
+    "pairs_total": 3808
+  },
+  "stations_dropped_city_not_found": 6,
+  "fallback_geocoder_requests_this_run": 114,
+  "stations_dropped_outside_state_bounds": 0,
+  "stations_final": 6620,
+  "stations_by_geocode_source": {
+    "census_exact_place": 6278,
+    "census_exact_cousub": 101,
+    "fallback_geocoder": 194,
+    "census_alias_place": 46,
+    "census_alias_cousub": 1
+  },
+  "price_usd_per_gallon": {
+    "min": 2.68733,
+    "max": 6.399,
+    "mean": 3.41741
+  },
+  "rejects_by_reason": {
+    "non_us_canadian_province": 620,
+    "exact_duplicate": 26,
+    "city_not_found": 6
+  }
+}
