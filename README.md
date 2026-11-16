@@ -136,7 +136,7 @@ This is a real response, trimmed: the geometry is shortened and 2 of the 3 stops
   "data_quality": { "route_distance_and_geometry": "from the routing provider (osrm)",
                     "station_positions": "estimated: city-level reference point of the station's city",
                     "location_confidence": { "high": 3, "medium": 0, "low": 0 },
-                    "detours": "estimated: 2 x straight-line distance from the route to the city point (conservative)",
+                    "detours": "approximation: 2 x straight-line distance from the route to the city point; real road detours can be shorter or longer",
                     "prices": "static OPIS file; average of a station's price rows",
                     "starting_fuel_value": "estimated: start price x starting gallons used",
                     "money_rounding": "each purchase rounded to the cent; totals are sums of the shown parts" },
@@ -390,11 +390,15 @@ from census.gov.
 
 The price file has no coordinates, and its addresses are highway/exit
 descriptions. Every station is therefore placed at its **city's** reference
-point. To stay safe:
+point. How the plan handles this:
 * the corridor is wide (15 miles);
 * every station used is charged a **detour of 2 × distance_from_route**. This
-  counts towards reachability and fuel burned. It may overstate distance and
-  cost slightly, but never understates them;
+  counts towards reachability and fuel burned. It is an **approximation, not a
+  bound**:
+  * it overstates the detour when the stop is right at an exit (the usual case);
+  * it understates it when the roads to the city point are indirect, since
+    straight-line distance is never longer than road distance;
+  * `low` location confidence (below) flags the riskier case;
 * every response carries a warning, and every stop shows its estimated
   distance from the route.
 
@@ -411,7 +415,7 @@ The single OSRM call also returns the highway refs along the route
 | `low` | Neither. The real detour may be longer than estimated, and the response warns. | 4 |
 
 * This raises confidence but does **not** produce exact coordinates.
-* It is **not** used to shrink the conservative detour estimate.
+* It is **not** used to change the detour approximation.
 * `min_location_confidence=high` makes the optimiser use only high-confidence
   stations. On the 30 routes this cost **+$20.64 in total (+0.2 %)**. The worst
   single route was +$5.84, and every route stayed feasible.

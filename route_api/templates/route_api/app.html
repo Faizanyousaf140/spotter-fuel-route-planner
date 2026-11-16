@@ -1,0 +1,695 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>{% if data %}{{ data.start.label }} → {{ data.finish.label }} · {% endif %}FuelRoute · Fuel Route Planner</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%232563EB'/%3E%3Cpath d='M9 25V9a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16M8 25h13M20 13h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0v-8l-3-3' fill='none' stroke='white' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+        integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+  <style>
+    :root {
+      --navy: #0F172A; --navy-2: #1E293B; --blue: #2563EB; --blue-2: #1D4ED8; --blue-soft: #EFF6FF;
+      --purple: #7C3AED; --teal: #0D9488; --teal-soft: #CCFBF1; --amber: #D97706; --amber-ink: #B45309; --amber-soft: #FEF3C7;
+      --red: #DC2626; --red-soft: #FEF2F2; --slate: #64748B; --slate-2: #94A3B8; --line: #E2E8F0; --line-2: #F1F5F9;
+      --bg: #F8FAFC; --card: #FFFFFF; --radius: 14px;
+      --shadow-sm: 0 1px 2px rgba(15,23,42,.06); --shadow: 0 1px 3px rgba(15,23,42,.06), 0 8px 24px -12px rgba(15,23,42,.18);
+      --header-h: 60px; --panel-w: 452px;
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; margin: 0; }
+    body { font: 14px/1.5 Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: var(--navy);
+           background: var(--bg); -webkit-font-smoothing: antialiased; }
+    button, input, select { font: inherit; color: inherit; }
+    :focus-visible { outline: 3px solid rgba(37,99,235,.45); outline-offset: 2px; border-radius: 8px; }
+    .num { font-variant-numeric: tabular-nums; }
+
+    /* ---------- header ---------- */
+    .topbar { height: var(--header-h); display: flex; align-items: center; gap: 16px; padding: 0 18px; background: var(--navy); color: #fff;
+              position: relative; z-index: 1100; box-shadow: 0 1px 0 rgba(255,255,255,.06); }
+    .brand { display: flex; align-items: center; gap: 10px; flex: none; text-decoration: none; color: inherit; }
+    .brand-mark { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center;
+                  background: linear-gradient(135deg, var(--blue), var(--purple)); box-shadow: 0 4px 14px -4px rgba(124,58,237,.7); }
+    .brand-name { font-weight: 800; font-size: 16px; letter-spacing: -.01em; }
+    .brand-name small { display: block; font-weight: 500; font-size: 11px; color: var(--slate-2); letter-spacing: .02em; }
+    .crumb { flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding-left: 16px; border-left: 1px solid rgba(255,255,255,.12); }
+    .crumb .route { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .crumb .sub { color: var(--slate-2); font-size: 12px; white-space: nowrap; }
+    .top-actions { display: flex; gap: 8px; flex: none; }
+    .tbtn { display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 12px; border-radius: 9px; border: 1px solid rgba(255,255,255,.16);
+            background: rgba(255,255,255,.06); color: #fff; font-weight: 600; font-size: 13px; cursor: pointer; text-decoration: none; transition: background .15s; }
+    .tbtn:hover { background: rgba(255,255,255,.14); }
+    .tbtn.primary { background: var(--blue); border-color: var(--blue); } .tbtn.primary:hover { background: var(--blue-2); }
+    .tbtn svg { width: 15px; height: 15px; }
+
+    /* ---------- shell ---------- */
+    .shell { height: calc(100vh - var(--header-h)); display: grid; grid-template-columns: var(--panel-w) 1fr; transition: grid-template-columns .25s ease; }
+    body.map-expanded .shell { grid-template-columns: 0 1fr; }
+    body.map-expanded .panel { visibility: hidden; }
+    .panel { overflow-y: auto; border-right: 1px solid var(--line); background: var(--bg); scroll-behavior: smooth; }
+    .panel-inner { padding: 16px; display: grid; gap: 14px; }
+    .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow-sm); }
+    .card-pad { padding: 16px; }
+    .eyebrow { font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--slate); margin: 0 0 10px; }
+    .muted { color: var(--slate); } .small { font-size: 12px; } .hidden { display: none !important; }
+
+    /* ---------- planner form ---------- */
+    .field-label { display: block; font-size: 12px; font-weight: 600; color: var(--slate); margin: 0 0 4px; }
+    .stack { position: relative; display: grid; gap: 10px; }
+    .input { display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 12px; border: 1px solid var(--line); border-radius: 10px; background: #fff; transition: border-color .15s, box-shadow .15s; }
+    .input:focus-within { border-color: var(--blue); box-shadow: 0 0 0 4px rgba(37,99,235,.12); }
+    .input input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; padding-right: 34px; }
+    .pt { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+    .swap { position: absolute; right: 10px; top: 50%; translate: 0 -12%; width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line);
+            background: #fff; color: var(--slate); cursor: pointer; display: grid; place-items: center; box-shadow: var(--shadow-sm); }
+    .swap:hover { color: var(--blue); border-color: var(--blue); }
+    .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+    .chip { border: 1px solid var(--line); background: #fff; border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; transition: all .15s; }
+    .chip:hover { border-color: var(--blue); color: var(--blue); background: var(--blue-soft); }
+    details.opts { margin-top: 12px; }
+    details.opts > summary { cursor: pointer; font-size: 13px; font-weight: 600; color: var(--slate); list-style: none; display: flex; align-items: center; gap: 6px; }
+    details.opts > summary::before { content: "›"; transition: rotate .15s; display: inline-block; }
+    details.opts[open] > summary::before { rotate: 90deg; }
+    .opts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px; }
+    input[type=range] { width: 100%; accent-color: var(--blue); }
+    select { width: 100%; height: 36px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 0 8px; }
+    .go { width: 100%; height: 44px; margin-top: 14px; border: 0; border-radius: 10px; background: var(--blue); color: #fff; font-weight: 700; cursor: pointer;
+          display: flex; align-items: center; justify-content: center; gap: 10px; box-shadow: 0 6px 16px -8px rgba(37,99,235,.9); transition: background .15s, transform .05s; }
+    .go:hover { background: var(--blue-2); } .go:active { transform: translateY(1px); } .go:disabled { opacity: .75; cursor: progress; }
+    .spin { width: 16px; height: 16px; border: 2px solid rgba(255,255,255,.35); border-top-color: #fff; border-radius: 50%; animation: spin .8s linear infinite; display: none; }
+    .go.loading .spin { display: inline-block; }
+    @keyframes spin { to { rotate: 360deg; } }
+    .form-collapsed .form-body { display: none; }
+    .form-head { display: none; align-items: center; justify-content: space-between; gap: 10px; }
+    .form-collapsed .form-head { display: flex; }
+    .linkbtn { border: 0; background: none; color: var(--blue); font-weight: 600; cursor: pointer; padding: 4px; }
+
+    /* ---------- states ---------- */
+    .how { margin: 0; padding: 0; list-style: none; display: grid; gap: 10px; }
+    .how li { display: grid; grid-template-columns: 28px 1fr; gap: 10px; color: var(--slate); font-size: 13px; }
+    .how li b { color: var(--navy); }
+    .how .ic { width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; background: var(--blue-soft); color: var(--blue); font-weight: 700; font-size: 12px; }
+    .alert { border-color: #FECACA; background: var(--red-soft); }
+    .alert h3 { margin: 0 0 4px; font-size: 15px; color: var(--red); }
+    .alert code { background: #FEE2E2; padding: 1px 6px; border-radius: 6px; font-size: 12px; }
+
+    /* ---------- summary ---------- */
+    .hero { padding: 18px; background: linear-gradient(160deg, #fff 55%, #F5F3FF); }
+    .hero-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+    .tag.est { background: var(--amber-soft); color: var(--amber-ink); }
+    .tag.ok { background: var(--teal-soft); color: #115E59; }
+    .tag.info { background: var(--blue-soft); color: var(--blue-2); }
+    .total { font-size: 40px; font-weight: 800; letter-spacing: -.03em; line-height: 1.1; margin: 8px 0 2px; }
+    .split { display: flex; height: 10px; border-radius: 999px; overflow: hidden; background: var(--line); margin: 14px 0 10px; }
+    .split span { display: block; height: 100%; }
+    .split-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .split-legend div { padding: 10px; border-radius: 10px; background: var(--line-2); }
+    .split-legend .k { font-size: 12px; color: var(--slate); display: flex; align-items: center; gap: 6px; }
+    .split-legend .v { font-size: 17px; font-weight: 700; margin-top: 2px; }
+    .sq { width: 9px; height: 9px; border-radius: 3px; flex: none; }
+    .stats { display: grid; grid-template-columns: repeat(4, 1fr); border-top: 1px solid var(--line); }
+    .stat { padding: 12px 8px; text-align: center; border-right: 1px solid var(--line); }
+    .stat:last-child { border-right: 0; }
+    .stat .v { font-size: 15px; font-weight: 700; white-space: nowrap; }
+    .stat .k { font-size: 11px; color: var(--slate); }
+    .meta-row { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px 16px; border-top: 1px solid var(--line); background: #FCFDFE; border-radius: 0 0 var(--radius) var(--radius); }
+    svg.chart { width: 100%; height: auto; display: block; }
+
+    /* ---------- itinerary ---------- */
+    .itinerary { list-style: none; margin: 0; padding: 0; position: relative; }
+    .itinerary::before { content: ""; position: absolute; left: 17px; top: 20px; bottom: 20px; width: 2px;
+                         background: linear-gradient(var(--teal), var(--purple) 50%, var(--navy)); opacity: .35; }
+    .stop { position: relative; display: grid; grid-template-columns: 36px 1fr; gap: 12px; padding: 6px 0; }
+    .node { width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; color: #fff; font-weight: 800; font-size: 13px;
+            border: 3px solid var(--bg); position: relative; z-index: 1; box-shadow: 0 0 0 1px var(--line); }
+    .scard { border: 1px solid var(--line); border-radius: 12px; background: #fff; padding: 12px; cursor: pointer; transition: border-color .15s, box-shadow .15s, transform .15s; }
+    .scard:hover { border-color: #BFDBFE; box-shadow: var(--shadow); }
+    .stop.selected .scard { border-color: var(--blue); box-shadow: 0 0 0 3px rgba(37,99,235,.15), var(--shadow); }
+    .stop.endpoint .scard { cursor: default; background: var(--line-2); }
+    .stop.endpoint .scard:hover { border-color: var(--line); box-shadow: none; }
+    .s-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+    .s-name { font-weight: 700; font-size: 14px; line-height: 1.3; }
+    .s-cost { font-weight: 800; font-size: 15px; white-space: nowrap; }
+    .s-loc { font-size: 12px; color: var(--slate); margin-top: 1px; }
+    .s-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .pill { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--line-2); color: var(--navy-2); }
+    .pill.conf-high { background: var(--blue-soft); color: var(--blue-2); }
+    .pill.conf-medium { background: var(--amber-soft); color: var(--amber-ink); }
+    .pill.conf-low { background: var(--red-soft); color: var(--red); }
+    .pill.conf-unknown { background: var(--line-2); color: var(--slate); }
+    .tank { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; margin-top: 8px; font-size: 11.5px; color: var(--slate); }
+    .tank-bar { position: relative; height: 6px; border-radius: 999px; background: var(--line); overflow: hidden; }
+    .tank-bar .a { position: absolute; inset: 0 auto 0 0; background: var(--slate-2); }
+    .tank-bar .b { position: absolute; top: 0; bottom: 0; background: var(--teal); }
+    details.why { margin-top: 8px; }
+    details.why > summary { cursor: pointer; font-size: 12px; font-weight: 600; color: var(--blue); list-style: none; width: fit-content; }
+    details.why > summary::-webkit-details-marker { display: none; }
+    details.why > summary::after { content: " ▾"; } details.why[open] > summary::after { content: " ▴"; }
+    .why-body { margin-top: 6px; font-size: 12px; color: var(--navy-2); background: var(--line-2); border-radius: 8px; padding: 8px 10px; }
+    .why-body dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; margin: 6px 0 0; }
+    .why-body dt { color: var(--slate); } .why-body dd { margin: 0; }
+    details.notes > summary { cursor: pointer; font-weight: 600; }
+    details.notes ul { margin: 10px 0 0; padding-left: 18px; color: var(--slate); font-size: 12px; display: grid; gap: 4px; }
+
+    /* ---------- map ---------- */
+    .mapwrap { position: relative; min-width: 0; }
+    #map { position: absolute; inset: 0; background: #E5E7EB; }
+    .leaflet-container { font: inherit; }
+    .map-msg { position: absolute; z-index: 800; top: 12px; left: 56px; right: 64px; padding: 9px 12px; border-radius: 10px; font-size: 13px;
+               background: var(--red-soft); border: 1px solid #FECACA; color: #991B1B; box-shadow: var(--shadow); display: none; }
+    .welcome { position: absolute; z-index: 700; left: 50%; top: 50%; translate: -50% -50%; width: min(380px, 86%); text-align: center;
+               background: rgba(255,255,255,.95); backdrop-filter: blur(4px); border: 1px solid var(--line); border-radius: 16px; padding: 22px; box-shadow: var(--shadow); }
+    .welcome h3 { margin: 0 0 6px; font-size: 17px; } .welcome p { margin: 0; color: var(--slate); font-size: 13px; }
+    .busy { position: absolute; z-index: 750; inset: 0; display: none; place-items: center; background: rgba(248,250,252,.55); }
+    .busy.on { display: grid; }
+    .busy .box { background: #fff; border: 1px solid var(--line); border-radius: 12px; padding: 12px 16px; box-shadow: var(--shadow); display: flex; gap: 10px; align-items: center; font-weight: 600; }
+    .busy .spin { display: inline-block; border-color: rgba(37,99,235,.25); border-top-color: var(--blue); }
+    .mapctl { display: grid; background: #fff; border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; border: 1px solid var(--line); }
+    .mapctl button { width: 36px; height: 36px; border: 0; background: #fff; cursor: pointer; display: grid; place-items: center; color: var(--navy-2); }
+    .mapctl button + button { border-top: 1px solid var(--line); }
+    .mapctl button:hover { background: var(--blue-soft); color: var(--blue); }
+    .mapctl svg { width: 17px; height: 17px; }
+    .leaflet-touch .leaflet-bar { border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; }
+    .leaflet-touch .leaflet-bar a { width: 36px; height: 36px; line-height: 34px; color: var(--navy-2); }
+    .legend { background: rgba(255,255,255,.96); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font-size: 12px; box-shadow: var(--shadow); line-height: 1.7; }
+    .legend b { display: block; margin-bottom: 2px; font-size: 11px; letter-spacing: .06em; text-transform: uppercase; color: var(--slate); }
+    .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; vertical-align: -1px; }
+    .legend .foot { margin-top: 4px; padding-top: 4px; border-top: 1px solid var(--line); color: var(--slate); font-size: 11px; }
+    .mk { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; color: #fff; font: 800 12px/1 system-ui, sans-serif;
+          border: 2.5px solid #fff; box-shadow: 0 2px 6px rgba(15,23,42,.45); transition: transform .15s, box-shadow .15s; }
+    .mk.hover { transform: scale(1.18); }
+    .mk.selected { transform: scale(1.3); box-shadow: 0 0 0 4px rgba(37,99,235,.35), 0 3px 10px rgba(15,23,42,.5); }
+    .true-pt { width: 6px; height: 6px; border-radius: 50%; background: var(--navy); border: 1.5px solid #fff; box-shadow: 0 0 0 1px rgba(15,23,42,.4); }
+    .pin { width: 32px; height: 32px; border-radius: 50% 50% 50% 4px; rotate: -45deg; display: grid; place-items: center; border: 2.5px solid #fff; box-shadow: 0 3px 8px rgba(15,23,42,.45); }
+    .pin span { rotate: 45deg; color: #fff; font: 800 13px/1 system-ui, sans-serif; }
+    .leaflet-popup-content-wrapper { border-radius: 14px; box-shadow: 0 12px 32px -8px rgba(15,23,42,.35); padding: 0; }
+    .leaflet-popup-content { margin: 0; min-width: 250px; }
+    .pp-head { padding: 12px 14px 10px; border-bottom: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
+    .pp-num { width: 26px; height: 26px; border-radius: 50%; color: #fff; display: grid; place-items: center; font-weight: 800; font-size: 12px; flex: none; }
+    .pp-title { font-weight: 700; font-size: 14px; line-height: 1.25; } .pp-sub { font-size: 12px; color: var(--slate); }
+    .pp-body { padding: 10px 14px 12px; }
+    .pp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .pp-grid div { background: var(--line-2); border-radius: 8px; padding: 6px 8px; }
+    .pp-grid .k { font-size: 11px; color: var(--slate); } .pp-grid .v { font-weight: 700; }
+    .pp-note { margin-top: 8px; font-size: 11.5px; color: var(--slate); }
+
+    /* ---------- responsive ---------- */
+    .tabs { display: none; }
+    @media (max-width: 1180px) { :root { --panel-w: 400px; } .stats { grid-template-columns: repeat(2, 1fr); } .stat:nth-child(2) { border-right: 0; } .stat:nth-child(-n+2) { border-bottom: 1px solid var(--line); } }
+    @media (max-width: 860px) {
+      :root { --header-h: 56px; }
+      .crumb .sub, .tbtn .lbl { display: none; }
+      .crumb { padding-left: 10px; }
+      .shell { display: block; height: calc(100dvh - var(--header-h) - 58px); position: relative; }
+      .panel, .mapwrap { position: absolute; inset: 0; }
+      .panel { border-right: 0; }
+      body[data-view="list"] .mapwrap { visibility: hidden; }
+      body[data-view="map"] .panel { visibility: hidden; }
+      .tabs { display: grid; grid-template-columns: 1fr 1fr; position: fixed; left: 0; right: 0; bottom: 0; height: 58px; z-index: 1100;
+              background: #fff; border-top: 1px solid var(--line); padding: 6px 10px calc(6px + env(safe-area-inset-bottom)); gap: 8px; }
+      .tabs button { border: 1px solid var(--line); background: #fff; border-radius: 10px; font-weight: 700; cursor: pointer; }
+      .tabs button[aria-selected="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+      #expand-ctl { display: none; }
+    }
+    @media (max-width: 420px) { .brand-name small { display: none; } .total { font-size: 34px; } }
+    @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation-duration: 0s !important; scroll-behavior: auto !important; } }
+  </style>
+</head>
+<body data-view="list">
+<header class="topbar">
+  <a class="brand" href="/" aria-label="FuelRoute home">
+    <span class="brand-mark" aria-hidden="true">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 22V5a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v17"/><path d="M2 22h13"/><path d="M14 9h2a2 2 0 0 1 2 2v5a1.5 1.5 0 0 0 3 0V8l-3-3"/><path d="M6 8h5"/></svg>
+    </span>
+    <span class="brand-name">FuelRoute<small>Fuel-stop optimizer</small></span>
+  </a>
+  <div class="crumb" aria-live="polite">
+    <span class="route" id="hdr-route">Plan a trip across the USA</span>
+    <span class="sub" id="hdr-sub">500-mile range · 10 mpg · OPIS prices</span>
+  </div>
+  <div class="top-actions">
+    <button class="tbtn hidden" id="share-btn" type="button" title="Copy a link to this saved plan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/></svg>
+      <span class="lbl" id="share-lbl">Share</span></button>
+    <a class="tbtn hidden" id="json-btn" target="_blank" rel="noopener" title="Open the JSON for this plan">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3H7a2 2 0 0 0-2 2v5a2 2 0 0 1-2 2 2 2 0 0 1 2 2v5a2 2 0 0 0 2 2h1"/><path d="M16 21h1a2 2 0 0 0 2-2v-5a2 2 0 0 1 2-2 2 2 0 0 1-2-2V5a2 2 0 0 0-2-2h-1"/></svg>
+      <span class="lbl">JSON</span></a>
+    <button class="tbtn primary hidden" id="new-btn" type="button">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      <span class="lbl">New route</span></button>
+  </div>
+</header>
+
+<div class="shell">
+  <aside class="panel" id="panel" aria-label="Trip details">
+    <div class="panel-inner">
+      <form class="card card-pad" id="plan-form" autocomplete="off" novalidate>
+        <div class="form-head">
+          <div><div class="eyebrow" style="margin:0">Route</div><div class="small muted" id="form-summary"></div></div>
+          <button type="button" class="linkbtn" id="edit-btn">Edit</button>
+        </div>
+        <div class="form-body">
+          <p class="eyebrow">Plan a route</p>
+          <div class="stack">
+            <div><label class="field-label" for="start">Start</label>
+              <div class="input"><span class="pt" style="background:var(--teal)"></span><input id="start" required placeholder="City, ST  or  lat,lng" value="New York, NY"></div></div>
+            <div><label class="field-label" for="finish">Destination</label>
+              <div class="input"><span class="pt" style="background:var(--navy)"></span><input id="finish" required placeholder="City, ST  or  lat,lng" value="Los Angeles, CA"></div></div>
+            <button type="button" class="swap" id="swap" title="Swap start and destination" aria-label="Swap start and destination">
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3"/></svg></button>
+          </div>
+          <div class="chips" aria-label="Example routes">
+            <button type="button" class="chip" data-s="New York, NY" data-f="Los Angeles, CA">New York → Los Angeles</button>
+            <button type="button" class="chip" data-s="Chicago, IL" data-f="Dallas, TX">Chicago → Dallas</button>
+            <button type="button" class="chip" data-s="Seattle, WA" data-f="Miami, FL">Seattle → Miami</button>
+            <button type="button" class="chip" data-s="Washington, DC" data-f="New York, NY">Washington → New York</button>
+          </div>
+          <details class="opts">
+            <summary>Advanced options</summary>
+            <div class="opts-grid">
+              <div><label class="field-label" for="corridor">Station corridor · <span id="corridor-v" class="num">15</span> mi</label>
+                <input id="corridor" type="range" min="1" max="50" step="1" value="15"></div>
+              <div><label class="field-label" for="minconf">Location confidence</label>
+                <select id="minconf"><option value="low">Any (cheapest)</option><option value="medium">Medium or high</option><option value="high">High only</option></select></div>
+            </div>
+          </details>
+          <button class="go" id="go" type="submit"><span class="spin"></span><span id="go-label">Find cheapest fuel stops</span></button>
+        </div>
+      </form>
+
+      <section class="card card-pad" id="intro">
+        <p class="eyebrow">How it works</p>
+        <ul class="how">
+          <li><span class="ic">1</span><span><b>One routing request</b> to OSRM per new trip. Repeated trips come from the cache.</span></li>
+          <li><span class="ic">2</span><span><b>6,620 OPIS truck stops</b> are matched to the actual route geometry.</span></li>
+          <li><span class="ic">3</span><span>An <b>exact optimizer</b> decides where and how much to buy. The 50-gal tank never runs dry.</span></li>
+          <li><span class="ic">4</span><span><b>Starting fuel</b> (full tank) is valued separately from fuel bought on the trip.</span></li>
+        </ul>
+      </section>
+
+      <section class="card card-pad alert hidden" id="error" role="alert"></section>
+
+      <section id="result" class="hidden" style="display:grid;gap:14px">
+        <div class="card">
+          <div class="hero">
+            <div class="hero-top"><span class="eyebrow" style="margin:0">Trip fuel cost</span><span class="tag est" title="Built from static OPIS prices and an estimated value for the starting tank">Estimate</span></div>
+            <div class="total num" id="s-total"></div>
+            <div class="small muted">Starting tank (estimated value) + fuel bought on the trip</div>
+            <div class="split" id="s-split" aria-hidden="true"></div>
+            <div class="split-legend">
+              <div><div class="k"><span class="sq" style="background:#C4B5FD"></span>Starting tank value</div><div class="v num" id="s-startval"></div><div class="small muted" id="s-startsub"></div></div>
+              <div><div class="k"><span class="sq" style="background:var(--blue)"></span>Refueling spend</div><div class="v num" id="s-refuel"></div><div class="small muted" id="s-refuelsub"></div></div>
+            </div>
+          </div>
+          <div class="stats">
+            <div class="stat"><div class="v num" id="s-dist"></div><div class="k">Route distance</div></div>
+            <div class="stat"><div class="v num" id="s-time"></div><div class="k">Est. driving time</div></div>
+            <div class="stat"><div class="v num" id="s-stops"></div><div class="k">Fuel stops</div></div>
+            <div class="stat"><div class="v num" id="s-gal"></div><div class="k">Gallons bought</div></div>
+          </div>
+          <div class="meta-row" id="s-meta"></div>
+        </div>
+
+        <div class="card card-pad">
+          <p class="eyebrow">Fuel in tank along the route</p>
+          <div id="s-chart"></div>
+        </div>
+
+        <div class="card card-pad">
+          <p class="eyebrow" style="display:flex;justify-content:space-between"><span>Itinerary</span><span class="muted" style="text-transform:none;letter-spacing:0;font-weight:500">Click a stop to show it on the map</span></p>
+          <ol class="itinerary" id="itinerary"></ol>
+        </div>
+
+        <div class="card card-pad">
+          <details class="notes"><summary>Data quality, estimates &amp; assumptions</summary><ul id="notes"></ul></details>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <section class="mapwrap" aria-label="Route map">
+    <div id="map"></div>
+    <div class="map-msg" id="map-msg" role="alert"></div>
+    <div class="busy" id="busy"><div class="box"><span class="spin"></span>Routing &amp; optimizing…</div></div>
+    <div class="welcome" id="welcome"><h3>Where are you driving?</h3>
+      <p>Pick a start and a destination, or try an example route. The route and the cheapest fuel stops will appear here.</p></div>
+  </section>
+</div>
+
+<nav class="tabs" role="tablist" aria-label="View">
+  <button role="tab" id="tab-list" aria-selected="true">Itinerary</button>
+  <button role="tab" id="tab-map" aria-selected="false">Map</button>
+</nav>
+
+{% if data %}{{ data|json_script:"plan-data" }}{% endif %}
+<noscript><p style="padding:20px">This page needs JavaScript. The API is at <code>/api/v1/route/</code>.</p></noscript>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+        integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+{% verbatim %}
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const COLORS = { high: "#2563EB", medium: "#D97706", low: "#DC2626", unknown: "#64748B" };
+  const CONF_LABEL = { high: "High confidence", medium: "Medium confidence", low: "Low confidence", unknown: "Confidence n/a" };
+  const usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" });
+  const fmt = (x, d = 1) => Number(x).toLocaleString("en-US", { minimumFractionDigits: d, maximumFractionDigits: d });
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const dur = (h) => (h == null ? "—" : `${Math.floor(h)}h ${String(Math.round((h % 1) * 60)).padStart(2, "0")}m`);
+  const confOf = (s) => (s.location && s.location.confidence) || "unknown";   // plans saved before v1.1 have none
+  const mobile = () => window.matchMedia("(max-width: 860px)").matches;
+  const mapMsg = (m) => { const n = $("map-msg"); n.textContent = m || ""; n.style.display = m ? "block" : "none"; };
+
+  let plan = null, map = null, layers = null, routeBounds = null, markers = [], selected = -1;
+
+  // ------------------------------------------------------------------ map
+  function svg(path) { return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${path}</svg>`; }
+  if (typeof L === "undefined") {
+    mapMsg("The map library could not be loaded (check your internet connection). All trip details are still listed.");
+  } else {
+    map = L.map("map", { zoomControl: false, worldCopyJump: true }).setView([39.5, -98.35], 4);
+    L.control.zoom({ position: "topright" }).addTo(map);
+    let tileErrors = 0;
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19, attribution: "&copy; OpenStreetMap contributors",
+      referrerPolicy: "strict-origin-when-cross-origin",   // OSM tile policy: tile requests need a Referer
+    }).on("tileerror", () => { if (++tileErrors === 4) mapMsg("Some map tiles failed to load. The route and stops are still shown."); })
+      .on("tileload", () => { if (tileErrors) { tileErrors = 0; mapMsg(""); } })
+      .addTo(map);
+    layers = L.layerGroup().addTo(map);
+
+    const Ctl = L.Control.extend({
+      options: { position: "topright" },
+      onAdd() {
+        const box = L.DomUtil.create("div", "mapctl");
+        box.id = "map-controls";
+        box.innerHTML = `<button type="button" id="fit-ctl" title="Fit route" aria-label="Fit the whole route">${svg('<path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/>')}</button>
+          <button type="button" id="expand-ctl" title="Expand map" aria-label="Expand map">${svg('<path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3"/>')}</button>`;
+        L.DomEvent.disableClickPropagation(box);
+        return box;
+      },
+    });
+    map.addControl(new Ctl());
+    $("fit-ctl").addEventListener("click", fitRoute);
+    $("expand-ctl").addEventListener("click", () => {
+      const on = document.body.classList.toggle("map-expanded");
+      $("expand-ctl").title = on ? "Show trip panel" : "Expand map";
+      setTimeout(() => { map.invalidateSize(); fitRoute(); }, 280);
+    });
+
+    const legend = L.control({ position: "bottomleft" });
+    legend.onAdd = () => {
+      const d = L.DomUtil.create("div", "legend");
+      d.innerHTML = `<b>Stop location confidence</b>
+        <div><i style="background:${COLORS.high}"></i>High: address highway is on the route</div>
+        <div><i style="background:${COLORS.medium}"></i>Medium: city point ≤ 3 mi from route</div>
+        <div><i style="background:${COLORS.low}"></i>Low: detour may be longer</div>
+        <div class="foot">Markers sit at each city's reference point (approximate).</div>`;
+      return d;
+    };
+    legend.addTo(map);
+    map.on("zoomend", declutter);
+  }
+
+  function fitRoute() {
+    if (!map) return;
+    if (routeBounds) map.fitBounds(routeBounds, { padding: [48, 48] }); else map.setView([39.5, -98.35], 4);
+  }
+
+  function pinIcon(color, letter) {
+    return L.divIcon({ className: "", html: `<div class="pin" style="background:${color}"><span>${letter}</span></div>`,
+                       iconSize: [32, 32], iconAnchor: [16, 34], popupAnchor: [0, -30] });
+  }
+  function stopIcon(i, dx = 0, dy = 0) {
+    const s = plan.fuel_stops[i], c = confOf(s);
+    const cls = `mk${i === selected ? " selected" : ""}`;
+    return L.divIcon({ className: "", html: `<div class="${cls}" id="mk-${i}" style="background:${COLORS[c]}">${s.sequence}</div>`,
+                       iconSize: [30, 30], iconAnchor: [15 - dx, 15 - dy], popupAnchor: [dx, dy - 14] });
+  }
+
+  // Markers closer than ~30 px on screen would hide each other. Fan their ICONS out around the
+  // true point (the LatLng is never changed) and mark the true point with a small dot.
+  let truePts = null;
+  function declutter() {
+    if (!map || !plan) return;
+    if (truePts) truePts.clearLayers(); else truePts = L.layerGroup().addTo(map);
+    const pts = markers.map((m) => map.latLngToLayerPoint(m.getLatLng()));
+    const groups = [], used = new Set();
+    pts.forEach((p, i) => {
+      if (used.has(i)) return;
+      const g = [i]; used.add(i);
+      pts.forEach((q, j) => { if (!used.has(j) && p.distanceTo(q) < 30) { g.push(j); used.add(j); } });
+      groups.push(g);
+    });
+    groups.forEach((g) => {
+      if (g.length === 1) { markers[g[0]].setIcon(stopIcon(g[0])); return; }
+      const r = 15 + 4 * g.length;
+      g.forEach((i, k) => {
+        const a = -Math.PI / 2 + (2 * Math.PI * k) / g.length;
+        markers[i].setIcon(stopIcon(i, Math.round(r * Math.cos(a)), Math.round(r * Math.sin(a))));
+      });
+      L.marker(markers[g[0]].getLatLng(), { interactive: false, keyboard: false,
+        icon: L.divIcon({ className: "", html: '<div class="true-pt"></div>', iconSize: [6, 6], iconAnchor: [3, 3] }) }).addTo(truePts);
+    });
+  }
+
+  function popupHtml(s) {
+    const c = confOf(s), hw = (s.location && s.location.matched_route_highways) || [];
+    return `<div class="pp-head"><div class="pp-num" style="background:${COLORS[c]}">${s.sequence}</div>
+        <div><div class="pp-title">${esc(s.name)}</div><div class="pp-sub">${esc(s.city)}, ${esc(s.state)} · mile ${fmt(s.mile_marker)}</div></div></div>
+      <div class="pp-body"><div class="pp-grid">
+        <div><div class="k">Price</div><div class="v num">$${s.price_per_gallon}/gal</div></div>
+        <div><div class="k">Buy</div><div class="v num">${s.gallons_purchased} gal</div></div>
+        <div><div class="k">Cost</div><div class="v num">${usd.format(s.cost)}</div></div>
+        <div><div class="k">Tank</div><div class="v num">${s.fuel_on_arrival_gallons} → ${s.fuel_on_departure_gallons}</div></div>
+      </div>
+      <div class="pp-note"><span style="color:${COLORS[c]};font-weight:700">${CONF_LABEL[c]}</span>${hw.length ? " · on " + esc(hw.join(", ")) : ""}
+        · approx. detour ${s.estimated_detour_miles} mi<br>Marker shows the city's reference point, not the exact truck stop.</div></div>`;
+  }
+
+  function drawMap(d) {
+    if (!map) return;
+    layers.clearLayers(); markers = []; selected = -1;
+    $("welcome").classList.add("hidden");
+    const casing = L.geoJSON(d.route.geometry, { style: { color: "#FFFFFF", weight: 9, opacity: 0.95, lineCap: "round" }, interactive: false }).addTo(layers);
+    L.geoJSON(d.route.geometry, { style: { color: "#7C3AED", weight: 5, opacity: 0.95, lineCap: "round" }, interactive: false }).addTo(layers);
+    routeBounds = casing.getBounds();
+    L.marker([d.start.lat, d.start.lon], { icon: pinIcon("#0D9488", "A"), title: "Start", zIndexOffset: 500 })
+      .bindPopup(`<div class="pp-head"><div class="pp-num" style="background:#0D9488">A</div><div><div class="pp-title">${esc(d.start.label)}</div><div class="pp-sub">Start · full tank (50 gal)</div></div></div>`).addTo(layers);
+    L.marker([d.finish.lat, d.finish.lon], { icon: pinIcon("#0F172A", "B"), title: "Destination", zIndexOffset: 500 })
+      .bindPopup(`<div class="pp-head"><div class="pp-num" style="background:#0F172A">B</div><div><div class="pp-title">${esc(d.finish.label)}</div><div class="pp-sub">Destination · mile ${fmt(d.route.distance_miles)}</div></div></div>`).addTo(layers);
+    d.fuel_stops.forEach((s, i) => {
+      const m = L.marker([s.location.lat, s.location.lon], { icon: stopIcon(i), title: `${s.sequence}. ${s.name}`, riseOnHover: true, zIndexOffset: 1000 })
+        .bindPopup(popupHtml(s), { maxWidth: 320, autoPanPadding: [40, 40] }).addTo(layers);
+      m.on("click", () => select(i, { fromMap: true }));
+      m.on("mouseover", () => hover(i, true)).on("mouseout", () => hover(i, false));
+      markers.push(m);
+    });
+    fitRoute();
+    setTimeout(declutter, 0);
+  }
+
+  function hover(i, on) {
+    const el = $(`mk-${i}`); if (el) el.classList.toggle("hover", on);
+  }
+
+  function select(i, { fromMap = false } = {}) {
+    if (!plan || !plan.fuel_stops[i]) return;
+    const prev = selected; selected = i;
+    document.querySelectorAll(".stop.selected").forEach((el) => el.classList.remove("selected"));
+    const row = document.querySelector(`.stop[data-i="${i}"]`);
+    if (row) { row.classList.add("selected"); if (fromMap && !mobile()) row.scrollIntoView({ block: "nearest", behavior: "smooth" }); }
+    if (!map) return;
+    if (prev >= 0 && markers[prev]) { const e = $(`mk-${prev}`); if (e) e.classList.remove("selected"); }
+    const el = $(`mk-${i}`); if (el) el.classList.add("selected");
+    if (!fromMap) {
+      if (mobile()) setView("map");
+      const m = markers[i];
+      map.flyTo(m.getLatLng(), Math.max(map.getZoom(), 9), { duration: 0.6 });
+      map.once("moveend", () => { declutter(); m.openPopup(); });
+    }
+  }
+
+  // ------------------------------------------------------------------ chart
+  function chart(d) {
+    const D = d.route.distance_miles || 1, W = 420, H = 156, L0 = 32, R0 = 8, T0 = 14, B0 = 24;
+    const X = (m) => L0 + (Math.min(Math.max(m, 0), D) / D) * (W - L0 - R0);
+    const Y = (g) => T0 + (1 - g / 50) * (H - T0 - B0);
+    const p = [[0, d.fuel_cost.starting_fuel_estimate.gallons_in_tank_at_start]];
+    d.fuel_stops.forEach((s) => { p.push([s.mile_marker, s.fuel_on_arrival_gallons], [s.mile_marker, s.fuel_on_departure_gallons]); });
+    p.push([D, d.fuel_usage.fuel_remaining_at_destination_gallons]);
+    const line = p.map(([m, g], i) => `${i ? "L" : "M"}${X(m).toFixed(1)},${Y(g).toFixed(1)}`).join(" ");
+    const area = `${line} L${X(D).toFixed(1)},${Y(0)} L${X(0)},${Y(0)} Z`;
+    const grid = [0, 25, 50].map((g) => `<line x1="${L0}" x2="${W - R0}" y1="${Y(g)}" y2="${Y(g)}" stroke="#E2E8F0" ${g === 50 ? 'stroke-dasharray="4 4"' : ""}/>
+      <text x="${L0 - 6}" y="${Y(g) + 3.5}" text-anchor="end" font-size="10" fill="#64748B">${g}</text>`).join("");
+    const ticks = [0, D / 2, D].map((m, i) => `<text x="${X(m)}" y="${H - 6}" text-anchor="${["start", "middle", "end"][i]}" font-size="10" fill="#64748B">${fmt(m, 0)} mi</text>`).join("");
+    const dots = d.fuel_stops.map((s, i) => `<g class="cdot" data-i="${i}" style="cursor:pointer"><circle cx="${X(s.mile_marker)}" cy="${Y(s.fuel_on_departure_gallons)}" r="5" fill="${COLORS[confOf(s)]}" stroke="#fff" stroke-width="2"/>
+      <title>${s.sequence}. ${esc(s.name)}: +${s.gallons_purchased} gal</title></g>`).join("");
+    return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gallons in the tank along the route">
+      <defs><linearGradient id="fuelgrad" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#7C3AED" stop-opacity=".25"/><stop offset="1" stop-color="#7C3AED" stop-opacity=".02"/></linearGradient></defs>
+      ${grid}<text x="${W - R0}" y="${Y(50) - 4}" text-anchor="end" font-size="10" fill="#64748B">tank 50 gal</text>
+      <path d="${area}" fill="url(#fuelgrad)"/><path d="${line}" fill="none" stroke="#7C3AED" stroke-width="2.2" stroke-linejoin="round"/>${dots}${ticks}</svg>
+      <div class="small muted">Gallons in the tank by mile. It never reaches below 0 or above the 50-gal tank. Dots are fuel stops.</div>`;
+  }
+
+  // ------------------------------------------------------------------ render
+  function render(d) {
+    plan = d;
+    const fc = d.fuel_cost, fu = d.fuel_usage, trip = fc.purchased_during_trip, sf = fc.starting_fuel_estimate;
+    const title = `${d.start.label} → ${d.finish.label}`;
+    document.title = `${title} · FuelRoute`;
+    $("hdr-route").textContent = title;
+    $("hdr-sub").textContent = `${fmt(d.route.distance_miles)} mi · ${usd.format(fc.total_fuel_cost)} est. fuel`;
+    $("form-summary").textContent = title;
+    $("plan-form").classList.add("form-collapsed");
+    ["share-btn", "json-btn", "new-btn"].forEach((id) => $(id).classList.remove("hidden"));
+    $("json-btn").href = d.plan_url || "#";
+    $("intro").classList.add("hidden"); $("error").classList.add("hidden"); $("result").classList.remove("hidden");
+
+    $("s-total").textContent = usd.format(fc.total_fuel_cost);
+    const startShare = fc.total_fuel_cost ? (sf.estimated_value_of_fuel_used / fc.total_fuel_cost) * 100 : 100;
+    $("s-split").innerHTML = `<span style="width:${startShare}%;background:#C4B5FD" title="Starting tank value"></span><span style="width:${100 - startShare}%;background:var(--blue)" title="Refueling spend"></span>`;
+    $("s-startval").textContent = usd.format(sf.estimated_value_of_fuel_used);
+    $("s-startsub").textContent = `${fmt(sf.gallons_used, 1)} gal @ $${sf.price_per_gallon} · estimate`;
+    $("s-refuel").textContent = usd.format(trip.cost);
+    $("s-refuelsub").textContent = trip.gallons ? `${fmt(trip.gallons, 1)} gal @ avg $${(trip.cost / trip.gallons).toFixed(3)}` : "no purchase needed";
+    $("s-dist").textContent = `${fmt(d.route.distance_miles, 0)} mi`;
+    $("s-time").textContent = dur(d.route.duration_hours);
+    $("s-stops").textContent = String(trip.number_of_stops);
+    $("s-gal").textContent = fmt(trip.gallons, 1);
+
+    const tags = [];
+    if (d.meta) {
+      const r = d.meta.map_api_calls.routing;
+      tags.push(`<span class="tag ${r === 0 ? "ok" : "info"}">${r} routing call${r === 1 ? "" : "s"}</span>`);
+      if (d.meta.plan_cache_hit) tags.push('<span class="tag ok">Plan cache hit</span>');
+      else if (d.meta.route_cache_hit) tags.push('<span class="tag ok">Route cache hit</span>');
+      if (d.meta.timings_ms && d.meta.timings_ms.total_request != null) tags.push(`<span class="tag info">${Math.round(d.meta.timings_ms.total_request)} ms</span>`);
+    } else if (d.created_at) {
+      tags.push(`<span class="tag info">Saved plan · ${esc(new Date(d.created_at).toLocaleString())}</span>`);
+    }
+    if (fu.longest_leg_miles != null) tags.push(`<span class="tag ${fu.longest_leg_miles <= (fu.max_range_miles || 500) ? "ok" : "est"}">Longest leg ${fmt(fu.longest_leg_miles, 0)} / ${fu.max_range_miles || 500} mi</span>`);
+    if (d.data_quality && d.data_quality.location_confidence) {
+      const lc = d.data_quality.location_confidence, n = (lc.high || 0) + (lc.medium || 0) + (lc.low || 0);
+      if (n) tags.push(`<span class="tag ${lc.low ? "est" : "ok"}">${lc.high}/${n} stops high confidence</span>`);
+    }
+    $("s-meta").innerHTML = tags.join("");
+    $("s-chart").innerHTML = chart(d);
+
+    const rows = [`<li class="stop endpoint"><div class="node" style="background:var(--teal)">A</div><div class="scard">
+        <div class="s-head"><div><div class="s-name">${esc(d.start.label)}</div><div class="s-loc">Start · mile 0</div></div><span class="pill">Full tank · 50 gal</span></div>
+        <div class="s-loc" style="margin-top:6px">Starting tank valued at $${sf.price_per_gallon}/gal (estimate)</div></div></li>`];
+    d.fuel_stops.forEach((s, i) => {
+      const c = confOf(s), a = s.fuel_on_arrival_gallons, b = s.fuel_on_departure_gallons;
+      const leg = s.leg_from_previous ? `<dt>Leg</dt><dd>${fmt(s.leg_from_previous.miles)} mi from the previous stop</dd>` : "";
+      rows.push(`<li class="stop" data-i="${i}">
+        <div class="node" style="background:${COLORS[c]}">${s.sequence}</div>
+        <div class="scard" tabindex="0" role="button" aria-label="Show stop ${s.sequence}, ${esc(s.name)}, on the map">
+          <div class="s-head"><div><div class="s-name">${esc(s.name)}</div><div class="s-loc">${esc(s.city)}, ${esc(s.state)} · mile ${fmt(s.mile_marker)}</div></div>
+            <div class="s-cost num">${usd.format(s.cost)}</div></div>
+          <div class="s-chips"><span class="pill num">$${s.price_per_gallon}/gal</span><span class="pill num">+${s.gallons_purchased} gal</span>
+            <span class="pill conf-${c}">${CONF_LABEL[c]}</span></div>
+          <div class="tank"><div class="tank-bar" title="Tank ${a} → ${b} gal"><span class="a" style="width:${(a / 50) * 100}%"></span>
+            <span class="b" style="left:${(a / 50) * 100}%;width:${((b - a) / 50) * 100}%"></span></div><span class="num">${fmt(a, 1)} → ${fmt(b, 1)} gal</span></div>
+          <details class="why"><summary>Why this stop?</summary><div class="why-body">${esc(s.reason)}
+            <dl>${leg}<dt>Address</dt><dd>${esc(s.address)}</dd><dt>Detour</dt><dd>≈ ${s.estimated_detour_miles} mi (approximation)</dd>
+            <dt>Position</dt><dd>city-level, ~${s.distance_from_route_miles} mi from the route</dd>
+            ${s.location && s.location.confidence_reason ? `<dt>Confidence</dt><dd>${esc(s.location.confidence_reason)}</dd>` : ""}</dl></div></details>
+        </div></li>`);
+    });
+    rows.push(`<li class="stop endpoint"><div class="node" style="background:var(--navy)">B</div><div class="scard">
+        <div class="s-head"><div><div class="s-name">${esc(d.finish.label)}</div><div class="s-loc">Destination · mile ${fmt(d.route.distance_miles)}</div></div>
+        <span class="pill num">${fmt(fu.fuel_remaining_at_destination_gallons, 1)} gal left</span></div></div></li>`);
+    $("itinerary").innerHTML = rows.join("");
+    document.querySelectorAll(".stop[data-i] .scard").forEach((card) => {
+      const i = Number(card.closest(".stop").dataset.i);
+      card.addEventListener("click", (e) => { if (e.target.closest("details")) return; select(i); });
+      card.addEventListener("keydown", (e) => { if ((e.key === "Enter" || e.key === " ") && !e.target.closest("summary")) { e.preventDefault(); select(i); } });
+      card.addEventListener("mouseenter", () => hover(i, true));
+      card.addEventListener("mouseleave", () => hover(i, false));
+    });
+    document.querySelectorAll(".cdot").forEach((g) => g.addEventListener("click", () => select(Number(g.dataset.i))));
+
+    const notes = (d.warnings || []).map((w) => `<li>${esc(w)}</li>`);
+    if (d.data_quality) Object.entries(d.data_quality).forEach(([k, v]) => {
+      const val = typeof v === "object" ? Object.entries(v).map(([a, b]) => `${a}: ${b}`).join(", ") : v;
+      notes.push(`<li><b>${esc(k.replace(/_/g, " "))}</b>: ${esc(val)}</li>`);
+    });
+    $("notes").innerHTML = notes.join("");
+    drawMap(d);
+  }
+
+  function showError(status, body) {
+    const e = (body && body.error) || { code: "network_error", message: "Could not reach the server. Is it running?", details: {} };
+    const det = e.details && Object.keys(e.details).length
+      ? `<ul class="small" style="margin:8px 0 0;padding-left:18px">${Object.entries(e.details).map(([k, v]) =>
+          `<li><b>${esc(k.replace(/_/g, " "))}</b>: ${esc(Array.isArray(v) ? v.join(" ") : (typeof v === "object" ? JSON.stringify(v) : v))}</li>`).join("")}</ul>` : "";
+    $("error").innerHTML = `<h3>${status ? "Can't plan this trip" : "Request failed"}</h3><div>${esc(e.message)}</div>
+      <div class="small" style="margin-top:6px"><code>${esc(e.code)}</code>${status ? ` · HTTP ${status}` : ""}</div>${det}`;
+    $("error").classList.remove("hidden");
+    $("error").scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  // ------------------------------------------------------------------ form & chrome
+  const form = $("plan-form"), go = $("go");
+  function setView(v) {
+    document.body.dataset.view = v;
+    $("tab-list").setAttribute("aria-selected", String(v === "list"));
+    $("tab-map").setAttribute("aria-selected", String(v === "map"));
+    if (v === "map" && map) setTimeout(() => { map.invalidateSize(); if (selected < 0) fitRoute(); }, 30);
+  }
+  $("tab-list").addEventListener("click", () => setView("list"));
+  $("tab-map").addEventListener("click", () => setView("map"));
+  $("swap").addEventListener("click", () => { const a = $("start").value; $("start").value = $("finish").value; $("finish").value = a; });
+  document.querySelectorAll(".chip").forEach((c) => c.addEventListener("click", () => { $("start").value = c.dataset.s; $("finish").value = c.dataset.f; form.requestSubmit(); }));
+  $("corridor").addEventListener("input", (e) => { $("corridor-v").textContent = e.target.value; });
+  $("edit-btn").addEventListener("click", () => { form.classList.remove("form-collapsed"); $("start").focus(); });
+  $("new-btn").addEventListener("click", () => { setView("list"); form.classList.remove("form-collapsed"); $("panel").scrollTop = 0; $("start").select(); });
+  $("share-btn").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(location.href); $("share-lbl").textContent = "Copied ✓"; }
+    catch { window.prompt("Copy this link:", location.href); }
+    setTimeout(() => { $("share-lbl").textContent = "Share"; }, 1800);
+  });
+
+  form.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const body = { start: $("start").value.trim(), finish: $("finish").value.trim(),
+                   corridor_miles: Number($("corridor").value), min_location_confidence: $("minconf").value };
+    if (!body.start || !body.finish) { showError(400, { error: { code: "invalid_request", message: "Enter both a start and a destination.", details: {} } }); return; }
+    go.disabled = true; go.classList.add("loading"); $("go-label").textContent = "Routing & optimizing…"; $("busy").classList.add("on");
+    $("error").classList.add("hidden");
+    try {
+      const res = await fetch("/api/v1/route/", { method: "POST", headers: { "Content-Type": "application/json", Accept: "application/json" }, body: JSON.stringify(body) });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data) { render(data); if (data.map_url) history.replaceState(null, "", new URL(data.map_url).pathname); }
+      else showError(res.status, data);
+    } catch (err) {
+      showError(0, null);
+    } finally {
+      go.disabled = false; go.classList.remove("loading"); $("go-label").textContent = "Find cheapest fuel stops"; $("busy").classList.remove("on");
+    }
+  });
+
+  window.addEventListener("resize", () => { if (map) map.invalidateSize(); });
+
+  // ------------------------------------------------------------------ initial state
+  const initial = $("plan-data");
+  if (initial) {
+    const d = JSON.parse(initial.textContent);
+    $("start").value = d.start.query || d.start.label; $("finish").value = d.finish.query || d.finish.label;
+    if (d.assumptions) {
+      if (d.assumptions.station_corridor_miles) { $("corridor").value = d.assumptions.station_corridor_miles; $("corridor-v").textContent = d.assumptions.station_corridor_miles; }
+      if (d.assumptions.min_location_confidence) $("minconf").value = d.assumptions.min_location_confidence;
+    }
+    render(d);
+  } else {
+    const q = new URLSearchParams(location.search);
+    if (q.get("start") && q.get("finish")) { $("start").value = q.get("start"); $("finish").value = q.get("finish"); form.requestSubmit(); }
+  }
+  window.FuelRoute = { select, fitRoute, setView, get plan() { return plan; }, get markers() { return markers; } };   // used by browser tests
+})();
+</script>
+{% endverbatim %}
+</body>
+</html>

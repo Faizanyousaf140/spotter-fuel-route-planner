@@ -96,11 +96,18 @@ class HealthView(APIView):
 
 
 def route_map(request, plan_id):
-    """GET /api/v1/route/<plan_id>/map/ - Leaflet map of a saved plan (HTML)."""
+    """GET /api/v1/route/<plan_id>/map/ - the planner app showing a saved plan (HTML)."""
     plan = get_object_or_404(RoutePlan, pk=plan_id)
-    return render(request, "route_api/map.html", {"plan": plan, "data": plan.response})
+    data = {
+        "plan_id": str(plan.id),
+        "created_at": plan.created_at.isoformat(),
+        "map_url": request.build_absolute_uri(reverse("route-plan-map", args=[plan.id])),
+        "plan_url": request.build_absolute_uri(reverse("route-plan-detail", args=[plan.id])),
+        **plan.response,
+    }
+    return render(request, "route_api/app.html", {"plan": plan, "data": data})
 
 
 def demo_page(request):
-    """GET / - small form that calls the API and opens the saved map."""
-    return render(request, "route_api/demo.html")
+    """GET / - the planner app (form, results, map). ?start=..&finish=.. plans immediately."""
+    return render(request, "route_api/app.html", {"data": None})

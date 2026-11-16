@@ -32,13 +32,14 @@ from .station_service import get_station_index
 logger = logging.getLogger(__name__)
 
 # Bump when the plan computation or the response format changes (invalidates cached plans).
-PLAN_CACHE_VERSION = "p1"
+PLAN_CACHE_VERSION = "p2"
 
 COORDINATE_WARNING = (
     "Station coordinates are approximate: the price file has no coordinates, so each station is placed at "
     "its city's reference point (US Census Gazetteer, or a one-time geocoder lookup). "
     "distance_from_route_miles and estimated_detour_miles are straight-line estimates, not road distances; "
-    "each used station is charged a detour of 2 x its distance from the route (a conservative estimate)."
+    "each used station is charged a detour of 2 x its straight-line distance from the route. This is an "
+    "approximation: the real road detour can be shorter (stop at the exit) or longer (indirect roads)."
 )
 PRICE_WARNING = (
     "Prices come from the supplied OPIS file (one record per station ID, averaging duplicate price rows); "
@@ -224,7 +225,8 @@ def plan_route(start_value, finish_value, *, corridor_miles: float | None = None
             "route_distance_and_geometry": f"from the routing provider ({route.provider})",
             "station_positions": "estimated: city-level reference point of the station's city",
             "location_confidence": _confidence_counts(summary["stops"]),
-            "detours": "estimated: 2 x straight-line distance from the route to the city point (conservative)",
+            "detours": "approximation: 2 x straight-line distance from the route to the city point; "
+                       "real road detours can be shorter or longer",
             "prices": "static OPIS file; average of a station's price rows",
             "starting_fuel_value": "estimated: start price x starting gallons used",
             "money_rounding": "each purchase rounded to the cent; totals are sums of the shown parts",
