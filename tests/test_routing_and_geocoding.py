@@ -5,7 +5,7 @@ from unittest import mock
 import numpy as np
 from django.conf import settings
 from django.core.cache import cache
-from django.test import SimpleTestCase, TestCase, override_settings
+from django.test import SimpleTestCase, TestCase, TransactionTestCase, override_settings
 
 from route_api.models import FuelStation
 from route_api.services import geocoding_service, nominatim
@@ -229,7 +229,7 @@ class LocationResolutionTests(SimpleTestCase):
         self.assertEqual(ctx.exception.status_code, 503)
 
 
-class StationIndexDatabaseTests(TestCase):
+class StationIndexDatabaseTests(TransactionTestCase):
     def tearDown(self):
         reset_station_index()
 
@@ -239,13 +239,16 @@ class StationIndexDatabaseTests(TestCase):
             get_station_index()
         self.assertIn("load_stations", ctx.exception.message)
 
-    def test_loads_from_database_once(self):
+    def test_loads_station_rows_once_and_checks_revision_on_every_access(self):
         FuelStation.objects.create(opis_id=7, name="WOODSHED", address="I-44", city="Big Cabin", state="OK",
                                    rack_ids="307", price="3.00733", price_min="3.00733", price_max="3.00733",
                                    latitude=36.53, longitude=-95.22, geocode_source="census_exact_place")
         reset_station_index()
-        with self.assertNumQueries(1):
+        # Freshness now requires a revision read on each access. Loading is
+        # bracketed by two additional revision reads to reject mixed snapshots.
+        with self.assertNumQueries(4):
             index = get_station_index()
+        with self.assertNumQueries(1):
             again = get_station_index()
         self.assertIs(index, again)
         self.assertIsInstance(index, StationIndex)

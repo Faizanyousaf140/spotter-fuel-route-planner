@@ -1,18 +1,13 @@
 """
 Match fuel stations to the actual route geometry.
 
-1. Route profile: cumulative driving distance along the full-resolution route
-   geometry, scaled so the total equals the provider's route distance, then
-   resampled to one point every ``spacing`` miles (default 2).
-2. Rough filters: (a) the route's bounding box expanded by the corridor;
-   (b) a grid whose cells are at least (corridor + sample spacing) wide: only
-   stations in a cell next to a cell containing a route sample can be within
-   the corridor. Both are exact pre-filters (no in-corridor station is lost).
-3. Nearest route sample for each remaining station (vectorised, chunked).
-4. Refinement: project the station onto the two route segments adjacent to
-   that sample to get its perpendicular distance from the route
-   (``off_route_miles``) and its position along the route (``mile_marker``).
-5. Keep stations with ``off_route_miles <= corridor``.
+1. Preserve all provider vertices and cumulative distances, scaled to the
+   provider's route distance. Regular points only densify long segments.
+2. Index every preserved segment's bounding box in a spatial grid.
+3. Query the station's conservative corridor box against that grid, including
+   long overflow segments. This never discards a segment inside the corridor.
+4. Project onto all eligible segments; choose the nearest and use its original
+   cumulative distance for the mile marker. Numerical ties choose the earliest.
 
 Station coordinates are city-level approximations (see README), so
 ``off_route_miles`` measures the distance from the *city point* to the route.
@@ -22,6 +17,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from functools import cached_property
 
 import numpy as np
 
@@ -29,12 +25,12 @@ from .geo import EARTH_RADIUS_MILES, haversine_miles
 from .station_service import StationIndex, StationRecord
 
 MILES_PER_DEG_LAT = EARTH_RADIUS_MILES * math.pi / 180  # ~69.09
-_CHUNK_ELEMENTS = 2_000_000  # stations x samples per vectorised block
+_CHUNK_ELEMENTS = 2_000_000  # station/segment pairs per vectorised block
 
 
 @dataclass(frozen=True)
 class RouteProfile:
-    lats: np.ndarray        # resampled route points
+    lats: np.ndarray        # original vertices plus optional densification
     lons: np.ndarray
     miles: np.ndarray       # cumulative driving miles at each resampled point
     total_miles: float
@@ -47,6 +43,29 @@ class RouteProfile:
     @property
     def scale(self) -> float:
         return self.total_miles / self.geometry_miles if self.geometry_miles else 1.0
+
+    @cached_property
+    def segment_grid(self):
+        """Index every original segment's bounding box; never sample away bends.
+
+        Long segments use a small overflow list, avoiding unbounded grid growth.
+        Querying the station's corridor box is conservative for the same local
+        projection used below, so it cannot remove a station inside the corridor.
+        """
+        cell = 0.25
+        cells, overflow = {}, []
+        lo_lat = np.floor(np.minimum(self.lats[:-1], self.lats[1:]) / cell).astype(int)
+        hi_lat = np.floor(np.maximum(self.lats[:-1], self.lats[1:]) / cell).astype(int)
+        lo_lon = np.floor(np.minimum(self.lons[:-1], self.lons[1:]) / cell).astype(int)
+        hi_lon = np.floor(np.maximum(self.lons[:-1], self.lons[1:]) / cell).astype(int)
+        for segment, (la, lb, xa, xb) in enumerate(zip(lo_lat, hi_lat, lo_lon, hi_lon)):
+            if (lb - la + 1) * (xb - xa + 1) > 64:
+                overflow.append(segment)
+                continue
+            for y in range(la, lb + 1):
+                for x in range(xa, xb + 1):
+                    cells.setdefault((y, x), []).append(segment)
+        return cell, cells, overflow
 
 
 @dataclass(frozen=True)
@@ -81,9 +100,12 @@ def build_route_profile(coordinates: np.ndarray, total_miles: float, spacing_mil
 
     cumulative *= total_miles / geometry_miles  # mile markers consistent with the provider's distance
     n_samples = max(2, int(math.ceil(total_miles / spacing_miles)) + 1)
-    targets = np.linspace(0.0, total_miles, n_samples)
+    # Keep EVERY provider vertex. Regular points only densify long segments;
+    # removing a corner here would replace the actual road with a shortcut.
+    targets = np.unique(np.concatenate((cumulative, np.linspace(0.0, total_miles, n_samples))))
     lats = np.interp(targets, cumulative, coords[:, 0])
-    lons = np.interp(targets, cumulative, coords[:, 1])
+    unwrapped_lons = np.degrees(np.unwrap(np.radians(coords[:, 1])))
+    lons = np.interp(targets, cumulative, unwrapped_lons)
     return RouteProfile(lats, lons, targets, float(total_miles), geometry_miles)
 
 
@@ -92,92 +114,79 @@ def match_stations(profile: RouteProfile, index: StationIndex, corridor_miles: f
     if corridor_miles < 0:
         raise ValueError("corridor_miles must be >= 0")
 
-    # 1. bounding-box pre-filter
+    # Shift longitudes to the route's unwrapped interval (Aleutian routes may
+    # cross +/-180). All projection and grid coordinates use the same interval.
+    center_lon = (profile.lons.min() + profile.lons.max()) / 2
+    station_lons = index.lons + 360 * np.rint((center_lon - index.lons) / 360)
+    # 1. Conservative bounding-box pre-filter over the preserved route.
     lat_margin = corridor_miles / MILES_PER_DEG_LAT
     max_abs_lat = min(float(np.max(np.abs(profile.lats))) + lat_margin, 89.0)
     lon_margin = corridor_miles / (MILES_PER_DEG_LAT * math.cos(math.radians(max_abs_lat)))
     in_box = (
         (index.lats >= profile.lats.min() - lat_margin) & (index.lats <= profile.lats.max() + lat_margin)
-        & (index.lons >= profile.lons.min() - lon_margin) & (index.lons <= profile.lons.max() + lon_margin)
+        & (station_lons >= profile.lons.min() - lon_margin) & (station_lons <= profile.lons.max() + lon_margin)
     )
     candidates = np.flatnonzero(in_box)
     if candidates.size == 0:
         return []
-    candidates = _grid_prefilter(candidates, index, profile, corridor_miles, max_abs_lat)
-    if candidates.size == 0:
+    if len(profile.lats) == 1:
+        off = haversine_miles(index.lats[candidates], station_lons[candidates], profile.lats[0], profile.lons[0])
+        results = [CorridorStation(index.records[i], 0.0, float(o), float(profile.lats[0]),
+                                   float((profile.lons[0] + 180) % 360 - 180))
+                   for i, o in zip(candidates, off) if o <= corridor_miles]
+        results.sort(key=lambda c: (c.mile_marker, c.price, c.station.opis_id))
+        return results
+
+    cell, cells, overflow = profile.segment_grid
+    pair_stations, pair_segments = [], []
+    for i in candidates:
+        lat, lon = index.lats[i], station_lons[i]
+        dy = corridor_miles / MILES_PER_DEG_LAT + 1e-10
+        dx = corridor_miles / (MILES_PER_DEG_LAT * max(math.cos(math.radians(lat)), 1e-10)) + 1e-10
+        found = set(overflow)
+        for y in range(math.floor((lat - dy) / cell), math.floor((lat + dy) / cell) + 1):
+            for x in range(math.floor((lon - dx) / cell), math.floor((lon + dx) / cell) + 1):
+                found.update(cells.get((y, x), ()))
+        pair_stations.extend([int(i)] * len(found))
+        pair_segments.extend(found)
+    if not pair_stations:
         return []
-
-    # 2. nearest resampled route point (equirectangular distance, chunked)
-    s_lat, s_lon = profile.lats, profile.lons
-    cos_s = np.cos(np.radians(s_lat))
-    nearest = np.empty(candidates.size, dtype=np.int64)
-    rows_per_chunk = max(1, _CHUNK_ELEMENTS // len(s_lat))
-    for start in range(0, candidates.size, rows_per_chunk):
-        idx = candidates[start : start + rows_per_chunk]
-        dy = index.lats[idx, None] - s_lat[None, :]
-        dx = (index.lons[idx, None] - s_lon[None, :]) * cos_s[None, :]
-        nearest[start : start + len(idx)] = np.argmin(dx * dx + dy * dy, axis=1)
-
-    # 3. refine against the two adjacent segments
-    off, miles, plat, plon = _project_to_adjacent_segments(
-        index.lats[candidates], index.lons[candidates], nearest, profile
-    )
-
-    keep = off <= corridor_miles
-    results = [
-        CorridorStation(index.records[i], float(m), float(o), float(la), float(lo))
-        for i, m, o, la, lo in zip(candidates[keep], miles[keep], off[keep], plat[keep], plon[keep])
-    ]
+    pair_stations = np.asarray(pair_stations, dtype=np.int64)
+    pair_segments = np.asarray(pair_segments, dtype=np.int64)
+    best = {}
+    for start in range(0, len(pair_stations), _CHUNK_ELEMENTS):
+        ids = pair_stations[start:start + _CHUNK_ELEMENTS]
+        segments = pair_segments[start:start + _CHUNK_ELEMENTS]
+        off, miles, plat, plon = _project_segment_pairs(index.lats[ids], station_lons[ids], segments, profile)
+        keep = off <= corridor_miles
+        ids, off, miles, plat, plon = ids[keep], off[keep], miles[keep], plat[keep], plon[keep]
+        # Deterministic ties choose the earliest point on the route.
+        order = np.lexsort((miles, off, ids))
+        ordered_ids = ids[order]
+        unique = np.concatenate(([True], ordered_ids[1:] != ordered_ids[:-1])) if len(order) else []
+        for k in order[unique]:
+            i = int(ids[k])
+            value = (float(off[k]), float(miles[k]), float(plat[k]), float(plon[k]))
+            if i not in best or value[:2] < best[i][:2]:
+                best[i] = value
+    results = [CorridorStation(index.records[i], m, o, la, (lo + 180) % 360 - 180)
+               for i, (o, m, la, lo) in best.items()]
     results.sort(key=lambda c: (c.mile_marker, c.price, c.station.opis_id))
     return results
 
 
-def _grid_prefilter(candidates, index, profile: RouteProfile, corridor_miles: float, max_abs_lat: float):
-    """Keep stations whose grid cell touches a cell containing a route sample."""
-    reach = corridor_miles + profile.spacing + 1e-6  # station -> nearest sample is at most this far
-    cell_lat = reach / MILES_PER_DEG_LAT
-    cell_lon = reach / (MILES_PER_DEG_LAT * math.cos(math.radians(max_abs_lat)))
-
-    def keys(lats, lons):
-        return np.floor(lats / cell_lat).astype(np.int64) * 1_000_003 + np.floor(lons / cell_lon).astype(np.int64)
-
-    sample_lat_idx = np.floor(profile.lats / cell_lat).astype(np.int64)
-    sample_lon_idx = np.floor(profile.lons / cell_lon).astype(np.int64)
-    dilated = np.unique(np.concatenate([
-        (sample_lat_idx + dy) * 1_000_003 + (sample_lon_idx + dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1)
-    ]))
-    mask = np.isin(keys(index.lats[candidates], index.lons[candidates]), dilated)
-    return candidates[mask]
-
-
-def _project_to_adjacent_segments(st_lat, st_lon, nearest, profile: RouteProfile):
-    """Perpendicular projection onto segments (k-1, k) and (k, k+1) in a local plane (miles)."""
-    n = len(profile.lats)
-    if n == 1:
-        off = haversine_miles(st_lat, st_lon, profile.lats[0], profile.lons[0])
-        zeros = np.zeros_like(st_lat)
-        return off, zeros, zeros + profile.lats[0], zeros + profile.lons[0]
-
-    best_off = np.full(st_lat.shape, np.inf)
-    best_mile = np.zeros(st_lat.shape)
-    best_lat = np.zeros(st_lat.shape)
-    best_lon = np.zeros(st_lat.shape)
-    for a in (np.clip(nearest - 1, 0, n - 2), np.clip(nearest, 0, n - 2)):
-        b = a + 1
-        lat_a, lon_a, lat_b, lon_b = profile.lats[a], profile.lons[a], profile.lats[b], profile.lons[b]
-        kx = MILES_PER_DEG_LAT * np.cos(np.radians(st_lat))  # local equirectangular scale at the station
-        ax, ay = (lon_a - st_lon) * kx, (lat_a - st_lat) * MILES_PER_DEG_LAT
-        bx, by = (lon_b - st_lon) * kx, (lat_b - st_lat) * MILES_PER_DEG_LAT
-        vx, vy = bx - ax, by - ay
-        seg_len2 = vx * vx + vy * vy
-        with np.errstate(invalid="ignore", divide="ignore"):
-            t = np.where(seg_len2 > 0, -(ax * vx + ay * vy) / seg_len2, 0.0)
-        t = np.clip(t, 0.0, 1.0)
-        px, py = ax + t * vx, ay + t * vy  # projected point relative to the station
-        off = np.hypot(px, py)
-        better = off < best_off
-        best_off = np.where(better, off, best_off)
-        best_mile = np.where(better, profile.miles[a] + t * (profile.miles[b] - profile.miles[a]), best_mile)
-        best_lat = np.where(better, lat_a + t * (lat_b - lat_a), best_lat)
-        best_lon = np.where(better, lon_a + t * (lon_b - lon_a), best_lon)
-    return best_off, best_mile, best_lat, best_lon
+def _project_segment_pairs(st_lat, st_lon, a, profile):
+    """Vectorized clamped projection onto every spatially eligible segment."""
+    b = a + 1
+    lat_a, lon_a, lat_b, lon_b = profile.lats[a], profile.lons[a], profile.lats[b], profile.lons[b]
+    kx = MILES_PER_DEG_LAT * np.cos(np.radians(st_lat))
+    ax, ay = (lon_a - st_lon) * kx, (lat_a - st_lat) * MILES_PER_DEG_LAT
+    bx, by = (lon_b - st_lon) * kx, (lat_b - st_lat) * MILES_PER_DEG_LAT
+    vx, vy = bx - ax, by - ay
+    length2 = vx * vx + vy * vy
+    with np.errstate(invalid="ignore", divide="ignore"):
+        t = np.where(length2 > 0, -(ax * vx + ay * vy) / length2, 0.0)
+    t = np.clip(t, 0.0, 1.0)
+    off = np.hypot(ax + t * vx, ay + t * vy)
+    miles = profile.miles[a] + t * (profile.miles[b] - profile.miles[a])
+    return off, miles, lat_a + t * (lat_b - lat_a), lon_a + t * (lon_b - lon_a)

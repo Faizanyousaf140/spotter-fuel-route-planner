@@ -20,9 +20,11 @@ def haversine_miles(lat1, lon1, lat2, lon2):
 
 
 def is_valid_coordinate(lat, lon) -> bool:
+    if isinstance(lat, bool) or isinstance(lon, bool):
+        return False
     try:
         lat, lon = float(lat), float(lon)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         return False
     return math.isfinite(lat) and math.isfinite(lon) and -90 <= lat <= 90 and -180 <= lon <= 180
 

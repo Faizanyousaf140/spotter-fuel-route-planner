@@ -27,6 +27,11 @@ class GeocoderUnavailable(PlannerError):
     code = "geocoder_unavailable"
 
 
+class LocationValidationUnavailable(PlannerError):
+    status_code = 503
+    code = "location_validation_unavailable"
+
+
 # --- routing ----------------------------------------------------------------
 class RouteNotFound(PlannerError):
     status_code = 422

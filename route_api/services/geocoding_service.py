@@ -17,16 +17,13 @@ from django.conf import settings
 from django.core.cache import cache
 
 from . import nominatim
-from .errors import GeocoderUnavailable, LocationNotFound, LocationOutsideUSA
+from .errors import GeocoderUnavailable, LocationNotFound, LocationOutsideUSA, LocationValidationUnavailable
 from .gazetteer import CANADIAN_PROVINCES, US_STATES, get_place_index, parse_city_state
 from .geo import is_valid_coordinate
+from .us_boundaries import get_boundary_index
 
-# A coordinate is accepted as "in the USA" when a US Census place lies within
-# this distance. Rejects oceans, Canada/Mexico interiors; border towns within a
-# few miles of the US can pass (documented limitation).
-MAX_MILES_TO_US_PLACE = 25.0
-
-_COORD_RE = re.compile(r"^\s*(-?\d+(?:\.\d+)?)\s*,\s*(-?\d+(?:\.\d+)?)\s*$")
+_NUMBER = r"[+-]?(?:(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?|inf(?:inity)?|nan)"
+_COORD_RE = re.compile(r"^\s*(" + _NUMBER + r")\s*,\s*(" + _NUMBER + r")\s*$", re.I)
 _FOREIGN_SUFFIX = re.compile(
     r"(,|\s)\s*(canada|m.xico|" + "|".join(sorted(CANADIAN_PROVINCES)) + r")\.?\s*$",
     re.IGNORECASE,
@@ -87,14 +84,20 @@ def _from_coordinates(text: str, lat, lon, field_name: str) -> ResolvedLocation:
     if not is_valid_coordinate(lat, lon):
         raise LocationNotFound(f"{field_name} has invalid coordinates: '{text}'. Use 'lat,lng' in decimal degrees.")
     lat, lon = float(lat), float(lon)
-    place, miles = get_place_index().nearest(lat, lon)
-    if miles > MAX_MILES_TO_US_PLACE:
+    state = _boundary_state(lat, lon)
+    if state is None:
         raise LocationOutsideUSA(
-            f"{field_name} ({lat:.5f}, {lon:.5f}) does not appear to be in the USA "
-            f"(nearest US place is {place.label}, {miles:.0f} miles away). "
+            f"{field_name} ({lat:.5f}, {lon:.5f}) is outside the supported US state boundaries. "
             "Check the order: coordinates must be 'lat,lng'."
         )
-    return ResolvedLocation(text, f"{lat:.5f},{lon:.5f} (near {place.label})", lat, lon, "coordinates")
+    return ResolvedLocation(text, f"{lat:.5f},{lon:.5f} ({state})", lat, lon, "coordinates")
+
+
+def _boundary_state(lat, lon):
+    try:
+        return get_boundary_index().state_at(lat, lon)
+    except (OSError, ValueError, KeyError, TypeError, IndexError, EOFError) as exc:
+        raise LocationValidationUnavailable("Offline US boundary data is unavailable; restore the committed reference file.") from exc
 
 
 def _from_fallback(text: str, field_name: str) -> ResolvedLocation:
@@ -124,4 +127,9 @@ def _from_fallback(text: str, field_name: str) -> ResolvedLocation:
         )
     if cached.get("state") not in US_STATES:
         raise LocationOutsideUSA(f"{field_name} '{text}' resolved outside the 50 US states/DC.")
+    if not is_valid_coordinate(cached.get("lat"), cached.get("lon")):
+        cache.delete(key)
+        raise GeocoderUnavailable("Geocoder returned invalid coordinates.")
+    if _boundary_state(cached["lat"], cached["lon"]) is None:
+        raise LocationOutsideUSA(f"{field_name} '{text}' resolved outside US state boundaries.")
     return ResolvedLocation(text, cached["label"], cached["lat"], cached["lon"], "nominatim", calls)

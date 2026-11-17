@@ -236,7 +236,7 @@
   </a>
   <div class="crumb" aria-live="polite">
     <span class="route" id="hdr-route">Plan a trip across the USA</span>
-    <span class="sub" id="hdr-sub">500-mile range · 10 mpg · OPIS prices</span>
+    <span class="sub" id="hdr-sub">{{ vehicle_range_miles|floatformat:"-2" }}-mile range · {{ vehicle_mpg|floatformat:"-2" }} mpg · OPIS prices</span>
   </div>
   <div class="top-actions">
     <button class="tbtn hidden" id="share-btn" type="button" title="Copy a link to this saved plan">
@@ -293,7 +293,7 @@
         <ul class="how">
           <li><span class="ic">1</span><span><b>One routing request</b> to OSRM per new trip. Repeated trips come from the cache.</span></li>
           <li><span class="ic">2</span><span><b>6,620 OPIS truck stops</b> are matched to the actual route geometry.</span></li>
-          <li><span class="ic">3</span><span>An <b>exact optimizer</b> decides where and how much to buy. The 50-gal tank never runs dry.</span></li>
+          <li><span class="ic">3</span><span>An <b>exact optimizer</b> decides where and how much to buy. Fuel may reach zero, but never falls below zero.</span></li>
           <li><span class="ic">4</span><span><b>Starting fuel</b> (full tank) is valued separately from fuel bought on the trip.</span></li>
         </ul>
       </section>
@@ -371,6 +371,7 @@
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   const dur = (h) => (h == null ? "—" : `${Math.floor(h)}h ${String(Math.round((h % 1) * 60)).padStart(2, "0")}m`);
   const confOf = (s) => (s.location && s.location.confidence) || "unknown";   // plans saved before v1.1 have none
+  const capacityOf = (d) => Number((d.assumptions && d.assumptions.tank_capacity_gallons) || d.fuel_cost.starting_fuel_estimate.gallons_in_tank_at_start || 50);
   const mobile = () => window.matchMedia("(max-width: 860px)").matches;
   const mapMsg = (m) => { const n = $("map-msg"); n.textContent = m || ""; n.style.display = m ? "block" : "none"; };
 
@@ -489,7 +490,7 @@
     L.geoJSON(d.route.geometry, { style: { color: "#7C3AED", weight: 5, opacity: 0.95, lineCap: "round" }, interactive: false }).addTo(layers);
     routeBounds = casing.getBounds();
     L.marker([d.start.lat, d.start.lon], { icon: pinIcon("#0D9488", "A"), title: "Start", zIndexOffset: 500 })
-      .bindPopup(`<div class="pp-head"><div class="pp-num" style="background:#0D9488">A</div><div><div class="pp-title">${esc(d.start.label)}</div><div class="pp-sub">Start · full tank (50 gal)</div></div></div>`).addTo(layers);
+      .bindPopup(`<div class="pp-head"><div class="pp-num" style="background:#0D9488">A</div><div><div class="pp-title">${esc(d.start.label)}</div><div class="pp-sub">Start · full tank (${capacityOf(d)} gal)</div></div></div>`).addTo(layers);
     L.marker([d.finish.lat, d.finish.lon], { icon: pinIcon("#0F172A", "B"), title: "Destination", zIndexOffset: 500 })
       .bindPopup(`<div class="pp-head"><div class="pp-num" style="background:#0F172A">B</div><div><div class="pp-title">${esc(d.finish.label)}</div><div class="pp-sub">Destination · mile ${fmt(d.route.distance_miles)}</div></div></div>`).addTo(layers);
     d.fuel_stops.forEach((s, i) => {
@@ -527,29 +528,31 @@
   // ------------------------------------------------------------------ chart
   function chart(d) {
     const D = d.route.distance_miles || 1, W = 420, H = 156, L0 = 32, R0 = 8, T0 = 14, B0 = 24;
+    const capacity = capacityOf(d);
     const X = (m) => L0 + (Math.min(Math.max(m, 0), D) / D) * (W - L0 - R0);
-    const Y = (g) => T0 + (1 - g / 50) * (H - T0 - B0);
+    const Y = (g) => T0 + (1 - g / capacity) * (H - T0 - B0);
     const p = [[0, d.fuel_cost.starting_fuel_estimate.gallons_in_tank_at_start]];
     d.fuel_stops.forEach((s) => { p.push([s.mile_marker, s.fuel_on_arrival_gallons], [s.mile_marker, s.fuel_on_departure_gallons]); });
     p.push([D, d.fuel_usage.fuel_remaining_at_destination_gallons]);
     const line = p.map(([m, g], i) => `${i ? "L" : "M"}${X(m).toFixed(1)},${Y(g).toFixed(1)}`).join(" ");
     const area = `${line} L${X(D).toFixed(1)},${Y(0)} L${X(0)},${Y(0)} Z`;
-    const grid = [0, 25, 50].map((g) => `<line x1="${L0}" x2="${W - R0}" y1="${Y(g)}" y2="${Y(g)}" stroke="#E2E8F0" ${g === 50 ? 'stroke-dasharray="4 4"' : ""}/>
+    const grid = [0, capacity / 2, capacity].map((g) => `<line x1="${L0}" x2="${W - R0}" y1="${Y(g)}" y2="${Y(g)}" stroke="#E2E8F0" ${g === capacity ? 'stroke-dasharray="4 4"' : ""}/>
       <text x="${L0 - 6}" y="${Y(g) + 3.5}" text-anchor="end" font-size="10" fill="#64748B">${g}</text>`).join("");
     const ticks = [0, D / 2, D].map((m, i) => `<text x="${X(m)}" y="${H - 6}" text-anchor="${["start", "middle", "end"][i]}" font-size="10" fill="#64748B">${fmt(m, 0)} mi</text>`).join("");
     const dots = d.fuel_stops.map((s, i) => `<g class="cdot" data-i="${i}" style="cursor:pointer"><circle cx="${X(s.mile_marker)}" cy="${Y(s.fuel_on_departure_gallons)}" r="5" fill="${COLORS[confOf(s)]}" stroke="#fff" stroke-width="2"/>
       <title>${s.sequence}. ${esc(s.name)}: +${s.gallons_purchased} gal</title></g>`).join("");
     return `<svg class="chart" viewBox="0 0 ${W} ${H}" role="img" aria-label="Gallons in the tank along the route">
       <defs><linearGradient id="fuelgrad" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#7C3AED" stop-opacity=".25"/><stop offset="1" stop-color="#7C3AED" stop-opacity=".02"/></linearGradient></defs>
-      ${grid}<text x="${W - R0}" y="${Y(50) - 4}" text-anchor="end" font-size="10" fill="#64748B">tank 50 gal</text>
+      ${grid}<text x="${W - R0}" y="${Y(capacity) - 4}" text-anchor="end" font-size="10" fill="#64748B">tank ${capacity} gal</text>
       <path d="${area}" fill="url(#fuelgrad)"/><path d="${line}" fill="none" stroke="#7C3AED" stroke-width="2.2" stroke-linejoin="round"/>${dots}${ticks}</svg>
-      <div class="small muted">Gallons in the tank by mile. It never reaches below 0 or above the 50-gal tank. Dots are fuel stops.</div>`;
+      <div class="small muted">Gallons in the tank by mile. It never reaches below 0 or above the ${capacity}-gal tank. Dots are fuel stops.</div>`;
   }
 
   // ------------------------------------------------------------------ render
   function render(d) {
     plan = d;
     const fc = d.fuel_cost, fu = d.fuel_usage, trip = fc.purchased_during_trip, sf = fc.starting_fuel_estimate;
+    const capacity = capacityOf(d);
     const title = `${d.start.label} → ${d.finish.label}`;
     document.title = `${title} · FuelRoute`;
     $("hdr-route").textContent = title;
@@ -591,7 +594,7 @@
     $("s-chart").innerHTML = chart(d);
 
     const rows = [`<li class="stop endpoint"><div class="node" style="background:var(--teal)">A</div><div class="scard">
-        <div class="s-head"><div><div class="s-name">${esc(d.start.label)}</div><div class="s-loc">Start · mile 0</div></div><span class="pill">Full tank · 50 gal</span></div>
+        <div class="s-head"><div><div class="s-name">${esc(d.start.label)}</div><div class="s-loc">Start · mile 0</div></div><span class="pill">Full tank · ${capacity} gal</span></div>
         <div class="s-loc" style="margin-top:6px">Starting tank valued at $${sf.price_per_gallon}/gal (estimate)</div></div></li>`];
     d.fuel_stops.forEach((s, i) => {
       const c = confOf(s), a = s.fuel_on_arrival_gallons, b = s.fuel_on_departure_gallons;
@@ -603,8 +606,8 @@
             <div class="s-cost num">${usd.format(s.cost)}</div></div>
           <div class="s-chips"><span class="pill num">$${s.price_per_gallon}/gal</span><span class="pill num">+${s.gallons_purchased} gal</span>
             <span class="pill conf-${c}">${CONF_LABEL[c]}</span></div>
-          <div class="tank"><div class="tank-bar" title="Tank ${a} → ${b} gal"><span class="a" style="width:${(a / 50) * 100}%"></span>
-            <span class="b" style="left:${(a / 50) * 100}%;width:${((b - a) / 50) * 100}%"></span></div><span class="num">${fmt(a, 1)} → ${fmt(b, 1)} gal</span></div>
+          <div class="tank"><div class="tank-bar" title="Tank ${a} → ${b} gal"><span class="a" style="width:${(a / capacity) * 100}%"></span>
+            <span class="b" style="left:${(a / capacity) * 100}%;width:${((b - a) / capacity) * 100}%"></span></div><span class="num">${fmt(a, 1)} → ${fmt(b, 1)} gal</span></div>
           <details class="why"><summary>Why this stop?</summary><div class="why-body">${esc(s.reason)}
             <dl>${leg}<dt>Address</dt><dd>${esc(s.address)}</dd><dt>Detour</dt><dd>≈ ${s.estimated_detour_miles} mi (approximation)</dd>
             <dt>Position</dt><dd>city-level, ~${s.distance_from_route_miles} mi from the route</dd>

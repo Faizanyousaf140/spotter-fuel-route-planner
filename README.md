@@ -10,7 +10,7 @@ Prices come from the supplied OPIS file (`fuel-prices-for-be-assessment.csv`).
 
 * **Framework:** Django 6.1.3 and Django REST Framework 3.18.3, on Python 3.14.
 * **Routing:** the free OSRM demo server, with **one call per new route** and **zero on a cached route**.
-* **Station locations:** found once, offline, from US Census data. No geocoding happens at request time.
+* **Station locations:** prepared once from US Census data. City/state and coordinate inputs resolve offline; free-text inputs can use a cached Nominatim fallback.
 * **Fuel stops:** chosen by an exact minimum-cost dynamic programme. It is checked against an independent exhaustive solver.
 * **Location confidence:** every stop is rated by checking whether the highway in its address is one the route uses near that point.
 * **Self-consistent numbers:** every number in the response can be added up by hand and checks out exactly. This is enforced by a property test.
@@ -30,7 +30,8 @@ Prices come from the supplied OPIS file (`fuel-prices-for-be-assessment.csv`).
 12. [Known limitations](#known-limitations)
 13. [Demo: Loom walkthrough script](#demo-loom-walkthrough-script)
 14. [Project layout](#project-layout)
-15. [Quality audit (v1.1)](#quality-audit-v11)
+15. [Correctness hardening (v1.2)](#correctness-hardening-v12)
+16. [Earlier quality audit (v1.1)](#earlier-quality-audit-v11)
 
 ---
 
@@ -96,63 +97,175 @@ curl -X POST http://127.0.0.1:8000/api/v1/route/ -H "Content-Type: application/j
 
 ### Response
 
-This is a real response, trimmed: the geometry is shortened and 2 of the 3 stops are omitted.
+This is a real cached Chicago → Dallas response captured on 2026-11-17.
+Only the geometry is shortened and 2 of the 3 stops are omitted. Provider
+routes and their resulting prices may change when the routing data changes.
 
-```jsonc
+```json
 {
-  "plan_id": "…", "map_url": "http://127.0.0.1:8000/api/v1/route/…/map/", "plan_url": "http://127.0.0.1:8000/api/v1/route/…/",
-  "start":  { "query": "Chicago, IL", "label": "Chicago, IL", "lat": 41.837045, "lon": -87.684939, "resolved_by": "census_gazetteer" },
-  "finish": { "query": "Dallas, TX",  "label": "Dallas, TX",  "lat": 32.793333, "lon": -96.766513, "resolved_by": "census_gazetteer" },
-  "route": { "provider": "osrm", "distance_miles": 961.47, "duration_hours": 17.04,
-             "geometry": { "type": "LineString", "coordinates": [[-87.68488, 41.83705], "…"] },
-             "geometry_points_returned": 596, "geometry_points_from_provider": 9539 },
+  "plan_id": "d5a9b339-3e1c-449f-9bcd-3e9625ede36e",
+  "map_url": "http://127.0.0.1:8011/api/v1/route/d5a9b339-3e1c-449f-9bcd-3e9625ede36e/map/",
+  "plan_url": "http://127.0.0.1:8011/api/v1/route/d5a9b339-3e1c-449f-9bcd-3e9625ede36e/",
+  "start": {
+    "query": "Chicago, IL",
+    "label": "Chicago, IL",
+    "lat": 41.837045,
+    "lon": -87.684939,
+    "resolved_by": "census_gazetteer"
+  },
+  "finish": {
+    "query": "Dallas, TX",
+    "label": "Dallas, TX",
+    "lat": 32.793333,
+    "lon": -96.766513,
+    "resolved_by": "census_gazetteer"
+  },
+  "route": {
+    "provider": "osrm",
+    "distance_miles": 961.5,
+    "duration_hours": 17.04,
+    "geometry": {
+      "type": "LineString",
+      "coordinates": [
+        [
+          -87.68488,
+          41.83705
+        ],
+        [
+          -87.68116,
+          41.6918
+        ],
+        "…"
+      ]
+    },
+    "geometry_points_returned": 596,
+    "geometry_points_from_provider": 9539
+  },
   "fuel_stops": [
     {
-      "sequence": 1, "opis_id": 67427, "name": "CASEYS #2907", "address": "I-57 & I-62", "city": "Charleston", "state": "MO",
-      "location": { "lat": 36.916934, "lon": -89.333912, "precision": "city-level (approximate)",
-                    "confidence": "high", "matched_route_highways": ["I57"],
-                    "confidence_reason": "Address names I57, which the route uses near mile 377: the stop is very likely at an exit on the route." },
-      "price_per_gallon": 3.044, "mile_marker": 376.53,
-      "distance_from_route_miles": 0.21, "estimated_detour_miles": 0.42,
-      "leg_from_previous": { "miles": 376.75, "fuel_used_gallons": 37.675 },
-      "fuel_on_arrival_gallons": 12.325, "gallons_purchased": 7.699, "fuel_on_departure_gallons": 20.024, "cost": 23.44,
+      "sequence": 1,
+      "opis_id": 67427,
+      "name": "CASEYS #2907",
+      "address": "I-57 & I-62",
+      "city": "Charleston",
+      "state": "MO",
+      "location": {
+        "lat": 36.916934,
+        "lon": -89.333912,
+        "precision": "city-level (approximate)",
+        "confidence": "high",
+        "matched_route_highways": [
+          "I57"
+        ],
+        "confidence_reason": "Address names I57, which the route uses near mile 376: the stop is very likely at an exit on the route."
+      },
+      "price_per_gallon": 3.044,
+      "mile_marker": 376.39,
+      "distance_from_route_miles": 0.43,
+      "estimated_detour_miles": 0.85,
+      "leg_from_previous": {
+        "miles": 376.81,
+        "fuel_used_gallons": 37.681
+      },
+      "fuel_on_arrival_gallons": 12.319,
+      "gallons_purchased": 7.737,
+      "fuel_on_departure_gallons": 20.056,
+      "cost": 23.55,
       "decision": "reach_cheaper_station",
       "reason": "Bought only enough to reach PIT STOP (Wheatley, AR) at mile 576, which is cheaper ($2.999 vs $3.044/gal)."
     }
-    /* … PIT STOP, Wheatley AR (22.531 gal, $67.57); EXTRA MILE TRUCK STOP, Hooks TX (16.128 gal, $45.44) */
   ],
   "fuel_cost": {
-    "total_fuel_cost": 306.40,
-    "purchased_during_trip":  { "gallons": 46.358, "cost": 136.45, "number_of_stops": 3 },
-    "starting_fuel_estimate": { "gallons_in_tank_at_start": 50.0, "gallons_used": 50.0, "price_per_gallon": 3.399,
-                                "valuation_method": "nearest_corridor_station", "estimated_value_of_fuel_used": 169.95,
-                                "valued_at_station": { "name": "Gas N Wash", "city": "Chicago", "state": "IL", "…": "…" } },
+    "total_fuel_cost": 306.55,
+    "purchased_during_trip": {
+      "gallons": 46.411,
+      "cost": 136.6,
+      "number_of_stops": 3
+    },
+    "starting_fuel_estimate": {
+      "gallons_in_tank_at_start": 50.0,
+      "gallons_used": 50.0,
+      "price_per_gallon": 3.399,
+      "valuation_method": "nearest_corridor_station",
+      "estimated_value_of_fuel_used": 169.95,
+      "valued_at_station": {
+        "opis_id": 73127,
+        "name": "Gas N Wash",
+        "city": "Chicago",
+        "state": "IL",
+        "mile_marker": 0.0,
+        "distance_from_route_miles": 0.0
+      }
+    },
     "how_total_is_calculated": "starting_fuel_estimate.estimated_value_of_fuel_used + purchased_during_trip.cost",
     "currency": "USD"
   },
-  "fuel_usage": { "route_distance_miles": 961.47, "estimated_detour_miles": 2.11, "total_miles_driven": 963.58,
-                  "fuel_burned_gallons": 96.358, "fuel_remaining_at_destination_gallons": 0.0,
-                  "final_leg": { "miles": 161.28, "fuel_used_gallons": 16.128 }, "longest_leg_miles": 376.75, "max_range_miles": 500.0 },
-  "data_quality": { "route_distance_and_geometry": "from the routing provider (osrm)",
-                    "station_positions": "estimated: city-level reference point of the station's city",
-                    "location_confidence": { "high": 3, "medium": 0, "low": 0 },
-                    "detours": "approximation: 2 x straight-line distance from the route to the city point; real road detours can be shorter or longer",
-                    "prices": "static OPIS file; average of a station's price rows",
-                    "starting_fuel_value": "estimated: start price x starting gallons used",
-                    "money_rounding": "each purchase rounded to the cent; totals are sums of the shown parts" },
-  "assumptions": { "vehicle_range_miles": 500.0, "vehicle_mpg": 10.0, "tank_capacity_gallons": 50.0,
-                   "station_corridor_miles": 15.0, "min_location_confidence": "low", "…": "…" },
-  "warnings": [ "Station coordinates are approximate: …", "Prices come from the supplied OPIS file …" ],
-  "meta": { "map_api_calls": { "routing": 1, "geocoding": 0 }, "route_cache_hit": false, "plan_cache_hit": false,
-            "corridor_stations": 228, "stations_considered_by_optimizer": 108, "station_data_fingerprint": "a7e1ea968271cf0e",
-            "timings_ms": { "routing": 1868.2, "station_matching": 23.3, "fuel_optimization": 21.5, "total_request": 2013.6, "…": "…" } }
+  "fuel_usage": {
+    "route_distance_miles": 961.47,
+    "estimated_detour_miles": 2.64,
+    "total_miles_driven": 964.11,
+    "fuel_burned_gallons": 96.411,
+    "fuel_remaining_at_destination_gallons": 0.0,
+    "final_leg": {
+      "miles": 161.29,
+      "fuel_used_gallons": 16.129
+    },
+    "longest_leg_miles": 376.81,
+    "max_range_miles": 500.0
+  },
+  "data_quality": {
+    "route_distance_and_geometry": "from the routing provider (osrm)",
+    "station_positions": "estimated: city-level reference point of the station's city",
+    "location_confidence": {
+      "high": 3,
+      "medium": 0,
+      "low": 0
+    },
+    "detours": "approximation: 2 x straight-line distance from the route to the city point; real road detours can be shorter or longer",
+    "prices": "static OPIS file; average of a station's price rows",
+    "starting_fuel_value": "estimated: start price x starting gallons used",
+    "money_rounding": "each purchase rounded to the cent; totals are sums of the shown parts"
+  },
+  "assumptions": {
+    "vehicle_range_miles": 500.0,
+    "vehicle_mpg": 10.0,
+    "tank_capacity_gallons": 50.0,
+    "starting_fuel": "Full tank, valued at the price of the corridor station nearest the start.",
+    "fuel_remaining_at_destination": "Reported but not credited.",
+    "station_corridor_miles": 15.0,
+    "min_location_confidence": "low",
+    "detour_model": "2 x straight-line distance from the route to the station's city-level point.",
+    "optimization": "Exact minimum refuelling cost over corridor stations (dynamic programme)."
+  },
+  "warnings": [
+    "Station coordinates are approximate: the price file has no coordinates, so each station is placed at its city's reference point (US Census Gazetteer, or a one-time geocoder lookup). distance_from_route_miles and estimated_detour_miles are straight-line estimates, not road distances; each used station is charged a detour of 2 x its straight-line distance from the route. This is an approximation: the real road detour can be shorter (stop at the exit) or longer (indirect roads).",
+    "Prices come from the supplied OPIS file (one record per station ID, averaging duplicate price rows); they are not live prices."
+  ],
+  "meta": {
+    "map_api_calls": {
+      "routing": 0,
+      "geocoding": 0
+    },
+    "route_cache_hit": true,
+    "plan_cache_hit": true,
+    "corridor_stations": 229,
+    "corridor_stations_meeting_min_confidence": 229,
+    "stations_considered_by_optimizer": 109,
+    "stations_loaded": 6620,
+    "station_data_fingerprint": "139f2ebf554e11486911aa73",
+    "timings_ms": {
+      "resolve_locations": 0.2,
+      "station_index": 1.6,
+      "total_request": 11.1
+    }
+  }
 }
 ```
 
 Every number can be checked by hand:
-* $23.44 + $67.57 + $45.44 = $136.45;
-* $169.95 + $136.45 = $306.40;
-* 50 − 37.675 = 12.325 gal on arrival, and 12.325 + 7.699 = 20.024 gal on departure.
+* $23.55 + $67.61 + $45.44 = $136.60;
+* $169.95 + $136.60 = $306.55;
+* 50 − 37.681 = 12.319 gal on arrival, and 12.319 + 7.737 = 20.056 gal on departure.
 
 **Money is split in two:**
 * **`purchased_during_trip`:** money actually spent at the recommended stops.
@@ -171,7 +284,7 @@ Every error has the same shape, `{"error": {"code", "message", "details"}}`.
 | 415 | `unsupported_media_type` | The body is not `application/json` |
 | 405 | `method_not_allowed` | e.g. `GET /api/v1/route/` |
 | 404 | `not_found` | Unknown `plan_id` |
-| 422 | `location_outside_usa` | Canada or Mexico input, or coordinates not near any US place |
+| 422 | `location_outside_usa` | Canada or Mexico input, or coordinates outside the offline US land boundaries |
 | 422 | `location_not_found` | The text cannot be resolved |
 | 422 | `route_not_found` | The provider finds no drivable route (e.g. Los Angeles → Honolulu) |
 | 422 | `no_feasible_fuel_plan` | Some stretch longer than 500 miles has no usable station; `details` names the gap |
@@ -179,6 +292,7 @@ Every error has the same shape, `{"error": {"code", "message", "details"}}`.
 | 502 | `routing_provider_error` | The provider answered with something unusable |
 | 503 | `routing_unavailable` / `geocoder_unavailable` | The provider is unreachable or rate-limited |
 | 503 | `station_data_unavailable` | No stations loaded: run `load_stations` |
+| 503 | `location_validation_unavailable` | The committed offline boundary data is missing or corrupt |
 | 504 | `routing_timeout` | The provider timed out: connect 5 s, read 15 s, **30 s hard limit for the whole call** |
 | 500 | `internal_error` | Unexpected error. It is logged, and no stack trace is returned. |
 
@@ -195,8 +309,8 @@ services/planner.py ── orchestrates and times each step
   ├─ plan cache          identical request (same route, options, station data) → answered without routing work
   ├─ routing_service     1 OSRM call (overview=full, polyline6, steps) → cached in the DB cache; 0 calls on a hit;
   │                      single flight for concurrent identical requests; 30 s hard deadline
-  ├─ station_service     6,620 stations loaded from the DB once per process into numpy arrays
-  ├─ route_matching      route resampled every 2 mi → grid + bbox pre-filter → mile marker and off-route distance
+  ├─ station_service     6,620 stations in numpy arrays; DB revision check detects cross-process reloads
+  ├─ route_matching      preserve every original vertex → segment grid + bbox → mile marker and off-route distance
   ├─ highways            address highway (e.g. I-80) vs the route's highway refs → location confidence
   ├─ fuel_optimizer      exact minimum-cost refuelling (dynamic programme)
   └─ cost_calculator     starting-fuel valuation, per-stop gallons and cost, totals (rounded only at output)
@@ -204,9 +318,9 @@ services/planner.py ── orchestrates and times each step
 RoutePlan saved in the DB  →  JSON response + map_url  (/route/<id>/map/ renders from the DB)
 ```
 
-The place gazetteer and the station index are preloaded when the server starts
-(`WARMUP_ON_START`). Because of that, even the first request avoids the
-roughly 2 s load.
+The place gazetteer, boundary polygons and station index are preloaded when
+the server starts (`WARMUP_ON_START`). Each request checks a small database
+revision row before reusing the station index.
 
 ## Fuel model and assumptions
 
@@ -377,14 +491,45 @@ from census.gov.
   * `"lat,lng"` and `"City, ST"` are resolved **offline**.
   * Text naming Canada, a Canadian province or Mexico is rejected without any
     network call.
-  * Coordinates must lie within 25 miles of a US Census place.
+  * Coordinates are validated against committed US Census 2025 cartographic
+    land boundaries for the 50 states and DC, including remote Alaska and Hawaii.
+    Windsor and Tijuana are rejected; Yellowstone and remote US land are accepted.
+    No proximity buffer admits points across an international border.
 * **Matching** (`route_matching.py`):
-  1. The full route geometry is resampled to one point every 2 miles. Mile
-     markers are scaled to the provider's distance.
-  2. Stations are filtered to the route's bounding box plus the corridor, then
-     by a grid. Both filters are exact: they never drop an in-corridor station.
-  3. Each station is projected onto the route segments next to its nearest
-     route point. This gives `distance_from_route_miles` and `mile_marker`.
+  1. Keep every original provider vertex. Additional points densify long
+     segments without cutting corners. Cumulative mile markers are scaled to
+     the provider's distance.
+  2. A route bounding box and a grid of segment bounding boxes safely select
+     all segments that could intersect a station's corridor box. Long segments
+     use an overflow list. Longitudes are unwrapped across the antimeridian.
+  3. Project onto every eligible original segment, choose the nearest point,
+     and interpolate its cumulative mile marker. The right-angle regression
+     retains a station 0.848 miles away in a 1-mile corridor; the previous
+     shortcut measured 1.555 miles and incorrectly excluded it.
+
+### Station reload and cache contract
+
+`load_stations` and supported `FuelStation` ORM writes update the station
+dataset revision in the same transaction as the data. Every station-index
+access checks that revision, so running worker processes refresh after a
+committed reload without a restart. Index rebuilding checks the revision
+before and after reading rows and retries three times; repeated concurrent
+changes return a controlled 503. A request already using a committed snapshot
+may finish with that snapshot. Transaction-local snapshots are never published
+globally, including when a transaction rolls back.
+
+The fingerprint covers ID, name, address, city, state, effective price,
+coordinates, geocode source and parsed highway references. The persistent
+plan-cache key also covers MPG, maximum range, effective and default corridor,
+confidence selection, matching and response-geometry settings, calculation
+version, routing provider/endpoint, station revision/fingerprint and boundary
+data version. A configuration or station change recomputes the plan while
+still allowing a valid provider-route cache entry to be reused.
+
+Direct SQL, external database editors and other ORM-bypassing station writes
+must increment `StationDatasetRevision(pk=1).generation` in the **same
+transaction**. Use `load_stations` for supported dataset reloads. Migration
+`0003_stationdatasetrevision` is required.
 
 ### Station coordinates are city-level estimates
 
@@ -408,7 +553,7 @@ The station file's addresses name highways (e.g. `I-80, EXIT 143 & CR-S14`).
 The single OSRM call also returns the highway refs along the route
 (`I 80; US 6`). Each stop is rated:
 
-| Confidence | Rule | 81 stops on 30 real routes |
+| Confidence | Rule | Historical v1.1 audit: 81 stops on 30 real routes |
 |---|---|---|
 | `high` | The address names a highway (I-, US- or state route) the route uses within (distance from route + 5) miles of the stop's mile marker, so the stop is very likely at an exit on the route | 61 (75 %) |
 | `medium` | No highway match, but the city point is within 3 miles of the route | 16 |
@@ -417,73 +562,105 @@ The single OSRM call also returns the highway refs along the route
 * This raises confidence but does **not** produce exact coordinates.
 * It is **not** used to change the detour approximation.
 * `min_location_confidence=high` makes the optimiser use only high-confidence
-  stations. On the 30 routes this cost **+$20.64 in total (+0.2 %)**. The worst
+  stations. In the historical v1.1 audit this cost **+$20.64 in total (+0.2 %)**. The worst
   single route was +$5.84, and every route stayed feasible.
 
 ## Performance
 
-Measured on 2026-11-16 over real HTTP, with `runserver` (threaded) and
-`DEBUG=False`, on a Windows laptop whose CPU was already partly busy, so treat
-these as indicative. "Before" is the v1.0 build; "after" is this version.
+Measured on 2026-11-17 over real HTTP using threaded Django `runserver` on
+this Windows machine and an isolated SQLite database. Public OSRM latency
+varies; these are observations rather than latency guarantees. Raw results
+are in [`validation/route_audit.json`](validation/route_audit.json) and
+[`validation/timeout_benchmarks.json`](validation/timeout_benchmarks.json).
 
-| Request | Routing calls | Before | After |
-|---|---|---|---|
-| New York → Los Angeles, fresh process, uncached | 1 | 3,337 ms | 3,205 ms (OSRM: 2,756 ms) |
-| New York → Los Angeles, cached (median of 5) | 0 | 240 ms | **105 ms** |
-| Chicago → Dallas, cached | 0 | 118 ms | **68 ms** |
-| Washington → New York, cached | 0 | 57 ms | **51 ms** |
-| 8 concurrent clients × 6 cached requests | 0 | 5.4 req/s, p50 1,185 ms, p95 2,194 ms | **23.4 req/s, p50 304 ms, p95 432 ms** |
-| 4 concurrent identical **uncached** requests | **1 in total** | 1 call, but up to **30 min** while OSRM trickled its response | 1 call, 4.3 s; hard 30 s limit |
-| Validation error / outside-USA error | 0 | 32 / 19 ms | 39 / 16 ms |
+| Scenario | Routing calls | Result |
+|---|---|---|
+| 30 different uncached routes | 1 each | median 2,960 ms; p95 6,832 ms; range 2,049–12,975 ms |
+| 15 cached requests | 0 | median 58.5 ms; p95 153.4 ms |
+| 8 concurrent clients, 48 cached requests | 0 | 26.1 requests/s; median 176.5 ms; p95 752.2 ms |
+| 4 simultaneous identical uncached requests | **1 total** | all succeed in 4.08 s |
+| Real trickling response body, 0.8 s budget | 1 | 504 in 826 ms; zero remaining HTTP workers |
+| Real trickling headers, 0.8 s budget | 1 | 504 in 813 ms; zero remaining HTTP workers |
+| 4 simultaneous identical slow streams, 0.8 s budget | **1 total** | all 504 within 815 ms; zero remaining HTTP workers |
 
-* **Uncached requests:** the OSRM call is 85–97 % of the time.
-* **Cached requests:** identical requests (same route, options and station
-  data) are served from the **plan cache** without routing, matching or
-  optimisation. The station-data fingerprint in the cache key means
-  `load_stations` with new data can never serve an old plan.
-* **Startup:** the place gazetteer and station index are preloaded (about
-  1.4–2.2 s).
-* **Response size:** 62–71 KB for coast-to-coast routes. The geometry is
-  simplified from about 35,000 to about 2,600 points; matching uses the full
-  geometry.
-* **Provider payload:** OSRM is asked for `polyline6` + `steps`: 615 KB instead
-  of 822 KB of GeoJSON. It is decoded with a vectorised numpy decoder in 34 ms;
-  a pure-Python loop took 202 ms.
+Each real upstream exchange runs in one owned subprocess, with an absolute
+deadline enforced by its parent. The budget includes spacing-lock waits,
+single-flight waits, process startup, DNS, connection, TLS, headers and body.
+At expiry the parent kills and reaps the worker and closes its pipes; there
+are no abandoned executor threads or ongoing network operations. A small
+bounded termination/response overhead follows expiry (about 11–26 ms in the
+0.8-second benchmarks). Body size is capped, including gzip decompression.
+Actual read timeouts return 504; genuine connection failures return 503.
+
+Valid plan-cache hits skip routing, station matching and optimization. The
+station revision check still runs. Original geometry is retained for matching;
+only the response/map geometry is simplified. The process-per-exchange design
+adds startup overhead in return for cancellable network operations and uses
+only Python's standard library plus the existing dependencies.
 
 ## Testing
 
 ```bash
-python manage.py test tests                                          # 144 offline tests (~15 s)
-RUN_LIVE_TESTS=1 python manage.py test tests.test_live_integration   # 3 tests that call the real OSRM server
-python manage.py check && python manage.py makemigrations --check --dry-run
+python manage.py test tests                                       # 175 offline tests; 3 live tests skipped
+RUN_LIVE_TESTS=1 python manage.py test tests                        # all 178 tests, including real OSRM
+python manage.py check
+python manage.py makemigrations --check --dry-run
 ```
 
-Results of the last run on 2026-11-16: **144 offline tests passed**, plus
-**3 live tests passed** (`RUN_LIVE_TESTS=1`). `check` reported no issues, and
-`pip-audit` found no known vulnerabilities in `requirements.txt`.
+PowerShell: set `$env:RUN_LIVE_TESTS='1'` before the live command. The final
+2026-11-17 run passed **178 tests (175 offline + 3 live)**. No existing
+assertions were removed to obtain a pass. The station-index query-budget test
+now enforces the intentional revision-query contract: four queries to build
+the initial snapshot, then one small query for each reuse.
 
 | Module | Tests | Covers | External services |
 |---|---|---|---|
-| `test_station_dataset` | 18 | CSV validation, malformed rows, Canada filter, exact duplicates, averaging, gazetteer normalisation and aliases, bounding boxes | none |
-| `test_commands` | 5 | `build_station_dataset` → `load_stations` → database, fallback geocoder caching, wrong-state rejection, malformed CSV | **mocked** geocoder |
-| `test_geo_and_matching` | 19 | Distances, polyline, simplification, resampling, mile markers, corridor edge, bbox-vs-geometry, many stations | none |
-| `test_highways_and_polyline` | 5 | Address and OSRM highway parsing, confidence rules, vectorised decoder against the reference, malformed polylines | none |
-| `test_routing_and_geocoding` | 28 | OSRM/ORS parsing, NoRoute, timeout, 429, 5xx, bad payloads, route cache, location resolution, station index | **mocked** HTTP |
-| `test_fuel_optimizer` | 22 | Hand-calculated cases, infeasibility, 3,500 random cases against the exact reference, ledger checks, performance | none |
-| `test_cost_calculator` | 7 | Start price, starting fuel kept separate, detours, rounding; **property test: 300 random plans re-add exactly** | none |
-| `test_api` | 20 | JSON structure, status codes, persistence, saved map after a simulated restart, caching, all error paths | **mocked** OSRM |
-| `test_robustness` | 20 | Single flight with 8 threads, trickling-response deadline, oversized response, hung-call waiters, corrupted cache, plan cache and its invalidation, rate limit including spoofed `X-Forwarded-For`, zero-length route, corridor bounds, hostile strings, confidence filter, invariant guard | **mocked** |
-| `test_live_integration` | 3 | Real OSRM route, highway refs and matching; real "no route"; full HTTP → OSRM → plan → map; cache hit | **real** OSRM |
+| `test_station_dataset` | 18 | CSV validation, Canada filter, duplicates, averaging, gazetteer aliases, bounds | none |
+| `test_commands` | 5 | Dataset build/reload, fallback caching, wrong-state and malformed CSV | mocked geocoder |
+| `test_geo_and_matching` | 19 | Distances, polyline, simplification, mile markers, corridor edges, many stations | none |
+| `test_highways_and_polyline` | 5 | Address/route highway parsing, confidence, vectorized decoder | none |
+| `test_routing_and_geocoding` | 28 | Provider parsing/errors/cache, location resolution, revision-aware station index | mocked HTTP |
+| `test_fuel_optimizer` | 22 | Hand calculations, infeasibility, 3,500 exhaustive-reference comparisons, ledger | none |
+| `test_cost_calculator` | 7 | Start price, valuation, detours, rounding; 300 random published ledgers | none |
+| `test_api` | 20 | JSON, statuses, saved plans/maps, caches, errors | mocked OSRM |
+| `test_robustness` | 20 | Concurrency, cache corruption, rate limits, input, invariant guards | mocked HTTP |
+| `test_hardening` | 30 | Real trickling body/headers, deadlines and worker cleanup, original geometry, US polygons, MPG and metadata invalidation, rollback hazards, malformed JSON/huge coordinates, truthful explanations and Loom narration | real local HTTP server; no external service |
+| `test_station_revision_process` | 1 | Running observer refreshes after another process reloads all 6,620 stations | separate local processes and isolated SQLite DB |
+| `test_live_integration` | 3 | Real OSRM geometry/highways/matching, no route, complete API/map/cache flow | real OSRM |
 
-Further checks:
-* **Postman via Newman** against a live server with the default rate limit:
-  14 requests, 50 assertions, 0 failures.
-* **Map page in headless Edge**, for a new plan and for a plan saved before
-  v1.1: no JavaScript errors, with the route line, stop markers and legend
-  present. The stacked mobile layout was checked at 600 px.
-* **30-route audit:** every plan was re-checked independently. Legs are all
-  ≤ 500 mi (longest 498.57), fuel never goes below 0 or above 50 gal, and the
-  published ledger balances exactly.
+Further checks, with committed machine-readable results in `validation/`:
+* **30-route correctness audit:** every published leg, tank level, purchase,
+  fuel total and cent-rounded cost rechecked independently. All 30 succeed;
+  each uncached request makes one routing call. Sparse station coverage can
+  still legitimately produce 422 on other routes, such as Portland → San Diego.
+* **Independent optimizer sweep:** 20,000 seeded cases, including 6,951
+  feasible cases; zero mismatches against exhaustive search.
+* **Newman:** original Postman assertions on the normal server and real
+  connection-refused/slow-stream fault servers: 16 requests, 52 assertions,
+  zero failures. Normal server uses the default rate limit.
+* **Headless Edge:** real route/tiles, stop popups, legend, draggable desktop
+  divider, saved plan reload and JSON link, mobile map/list tabs, controlled
+  API errors, and graceful Leaflet failure. Zero JavaScript errors. Repeated
+  at 20 MPG to verify configuration-aware rendering and persistent-cache reuse.
+* **MPG restart check:** a persisted 10-MPG plan is recomputed at 20 MPG,
+  produces a 25-gallon tank and the correct halved fuel cost, then hits cache.
+  Both requests reuse the valid provider-route cache with zero routing calls.
+
+Reproduction commands (use a separate `SQLITE_PATH` database for audits):
+
+```bash
+python scripts/validate_hardening.py --help
+python scripts/benchmark_timeouts.py
+python scripts/run_postman_checks.py
+node scripts/check_browser.cjs
+python scripts/check_config_cache.py
+```
+
+Newman and Playwright are optional **validation tools**, installed in npm's
+cache rather than application requirements. `SPOTTER_NEWMAN_CLI`,
+`SPOTTER_PLAYWRIGHT_MODULE` and `SPOTTER_EDGE_PATH` select their local paths.
+Browser/config scripts default to a validation server on port 8011;
+the config check starts and stops its own second server on port 8016.
 
 ## Postman
 
@@ -524,12 +701,12 @@ All configuration comes from environment variables or `.env`. See `.env.example`
 | `DJANGO_ALLOWED_HOSTS` | `localhost,127.0.0.1` | Comma-separated host names |
 | `VEHICLE_RANGE_MILES` / `VEHICLE_MPG` | `500` / `10` | Vehicle model |
 | `MAX_OFF_ROUTE_MILES` | `15` | Station corridor width; can be overridden per request with `corridor_miles` |
-| `ROUTE_SAMPLE_SPACING_MILES` | `2` | Spacing of route points used for matching |
+| `ROUTE_SAMPLE_SPACING_MILES` | `2` | Maximum added sampling interval; all original route vertices are retained |
 | `ROUTING_PROVIDER` | `osrm` | `osrm` or `openrouteservice` |
 | `OSRM_BASE_URL` | `https://router.project-osrm.org` | Point this at a self-hosted OSRM for production |
 | `ORS_BASE_URL` / `ORS_API_KEY` | HeiGIT endpoint / empty | OpenRouteService settings |
 | `ROUTING_CONNECT_TIMEOUT` / `ROUTING_READ_TIMEOUT` | `5` / `15` s | Per-connection and per-read timeouts |
-| `ROUTING_TOTAL_TIMEOUT` | `30` s | Hard limit for a whole provider call. `requests` timeouts alone do not bound a trickling response. |
+| `ROUTING_TOTAL_TIMEOUT` | `30` s | Absolute exchange budget including waits and streaming, followed by bounded worker cleanup. |
 | `ROUTE_RATE_LIMIT` | `60/min` | Per-client-IP limit on `POST /api/v1/route/` (empty disables). Clients are identified by `REMOTE_ADDR`. |
 | `ROUTING_MIN_INTERVAL_SECONDS` | `1` | Minimum gap between routing calls per process (OSRM demo policy) |
 | `ROUTE_CACHE_SECONDS` | `604800` (7 days) | Route cache lifetime |
@@ -556,20 +733,16 @@ warnings until those HTTPS settings are switched on.
   used, even when that might be cheaper on a real road network.
 * **OSRM demo server.** It has no SLA, is limited to about 1 request per
   second, and is for non-commercial use only. Use a self-hosted OSRM or
-  OpenRouteService in production. Uncached requests take 2–4 s, almost all of
-  it the routing call.
+  OpenRouteService in production. The 30-route audit observed 2–13 s on uncached requests; the configured network deadline bounds upstream waits.
 * **Single flight works within one process.** Several server processes could
   each make one call for the same new route. That is still one call per
   process, and the results are shared through the database cache afterwards.
-* **CPU-bound work shares Python's global interpreter lock (GIL).** On cache
-  misses, one process handles about 5 concurrent plan computations per
-  second; use several worker processes in production. Identical requests are
+* **CPU-bound work shares Python's global interpreter lock (GIL).** CPU work on cache misses can contend within one process; use several worker processes when needed. Identical requests are
   served from the plan cache.
 * **Location confidence comes from address text.** It relies on OPIS address
   strings and OpenStreetMap highway refs. Addresses like `HIGHWAY 11/17` are
   ambiguous and are deliberately not matched.
-* **USA check for coordinates.** A point is accepted when a US Census place is
-  within 25 miles, so points just across the border can pass.
+* **US boundary precision.** The offline Census 1:500,000 cartographic land polygons are generalized, not survey-grade navigation boundaries. Small coastal features and points within the source's border generalization error can be misclassified. Territories and offshore water are excluded. No distance buffer is applied. Source, version and checksum are in `data/reference/us_boundaries.provenance.json`.
 * **Local server only.** This setup is for local use with `runserver`. A
   production deployment would add a WSGI server, static-file serving and HTTPS.
   Those were left out on purpose for this assessment.
@@ -586,7 +759,7 @@ the collection imported. Have the editor open on `route_api/services/`.
 | 1:15–2:30 | Postman: multi-stop New York → Los Angeles; scroll `fuel_stops`, `fuel_cost`, `meta`. Send again. Open `map_url` in a browser. | "Nine stops, each with gallons, cost and the reason it was chosen. Money spent on the trip is kept separate from the estimated value of the starting tank. `meta` shows 1 routing call. On the second send it's 0, a cache hit, and about 0.2 seconds." |
 | 2:30–3:00 | Postman: missing finish (400), Toronto (422), Anchorage → Seattle (422) | "Clear errors with consistent codes. Anchorage to Seattle is impossible because there's no usable station for 2,178 miles, and the API says exactly where the gap is." |
 | 3:00–3:50 | Editor: `fuel_optimizer.py` docstring | "The optimiser is an exact dynamic programme from the gas-station-problem literature. If the next stop is cheaper, buy just enough to reach it; otherwise fill up. That keeps the state space small, and it runs in milliseconds for hundreds of stations." |
-| 3:50–4:20 | Editor: `test_fuel_optimizer.py` brute-force reference; terminal running `python manage.py test tests` | "It's checked against an independent exhaustive search on 3,500 random cases in the suite and 20,000 in a one-off sweep, with zero mismatches. 144 offline tests cover concurrency, timeouts, caching and hand-checkable numbers, plus live OSRM tests." |
+| 3:50–4:20 | Editor: `test_fuel_optimizer.py` brute-force reference; terminal running `python manage.py test tests` | "It's checked against an independent exhaustive search on 3,500 random cases in the suite and 20,000 in a one-off sweep, with zero mismatches. 175 offline tests cover concurrency, real streaming timeouts, caching and hand-checkable numbers, plus 3 live OSRM tests." |
 | 4:20–4:40 | Map legend; README "Location confidence" | "The price file has no coordinates, so stations sit at city level. Each stop is rated by checking whether its address highway is on the route; 75 % of stops on 30 test routes are high confidence, and you can require that for about 0.2 % extra cost." |
 
 ## Project layout
@@ -594,7 +767,7 @@ the collection imported. Have the editor open on `route_api/services/`.
 ```
 config/                     settings (env-driven), urls, wsgi (+ startup warm-up)
 route_api/
-  models.py                 FuelStation, RoutePlan
+  models.py                 FuelStation, StationDatasetRevision, RoutePlan
   serializers.py            request validation
   views.py, urls.py         API views, saved-plan map, health, demo page
   exceptions.py             consistent JSON error format
@@ -602,29 +775,52 @@ route_api/
   management/commands/      build_place_reference, build_station_dataset, load_stations
   templates/route_api/      app.html: the web app (Leaflet map, trip summary, itinerary; no build step)
 data/
-  reference/                Census gazetteer extract and state bounding boxes (public domain)
+  reference/                Census gazetteer, offline state land polygons/provenance, build-time bounding boxes
   processed/                fuel_stations.csv (6,620), ingestion report, rejected records, unmatched cities
   cache/                    one-time fallback geocoder answers
 postman/                    Postman collection
-tests/                      147 tests (144 offline, 3 live)
+tests/                      178 tests (175 offline, 3 live)
+scripts/                    reproducible boundary build, route/optimizer audit, benchmarks, Newman/browser checks
+validation/                 captured review reproductions and final verification results
+Loom_Script_Spotter.md       corrected recording script (tracked copy)
 fuel-prices-for-be-assessment.csv          original price file (unchanged)
 Spotter_Django_Backend_Assessment.txt      original assignment text
 ```
 
 Data credits:
-* US Census Bureau Gazetteer Files (public domain).
+* US Census Bureau Gazetteer Files and 2025 cartographic state boundaries (public domain).
+  Boundary data: [Census cartographic boundary files](https://www.census.gov/geographies/mapping-files/time-series/geo/cartographic-boundary.html); rebuild with `python scripts/build_us_boundaries.py --help`.
 * © OpenStreetMap contributors (ODbL). This covers the routing data used by
   OSRM, the Nominatim geocoder and the map tiles.
 
-## Quality audit (v1.1)
+## Correctness hardening (v1.2)
 
-A final audit re-checked the delivered v1.0 build: 30 real routes, concurrent
+The independent review findings were reproduced before changing code; raw
+observations are in [`validation/review_reproduction_before.json`](validation/review_reproduction_before.json).
+The finding-by-finding causes, changed files, regression names, outcomes and
+remaining limitations are in [`validation/final_review.json`](validation/final_review.json).
+All ten findings have regression coverage. Changes include cancellable total
+HTTP deadlines and shared single-flight errors, original-segment matching,
+offline US polygons, complete configuration/data cache keys, atomic
+cross-process station revisions, complete station fingerprints, timeout
+classification, accurate optimizer explanations, controlled malformed-input
+handling, and corrected Loom narration. Defaults remain 500 miles and 10 MPG.
+The exact optimizer and the application dependencies are unchanged.
+
+The full offline/live suite, independent route/optimizer audits, real HTTP
+benchmarks, original Newman assertions and Edge checks passed. Measurements
+and precision/coverage limitations are documented above; saved historical
+plans retain their original snapshot and remain viewable.
+
+## Earlier quality audit (v1.1)
+
+Historical results from the audit of v1.0 (superseded where corrected by v1.2): 30 real routes, concurrent
 load, a browser, and the API output read with a reviewer's eye. Defects found
 and fixed:
 
 | Finding | Evidence | Fix |
 |---|---|---|
-| A routing call could hang for **30 minutes** | Measured: OSRM trickled a response; `requests` timeouts only bound each read. Single flight made 3 more requests wait as long. | Body streamed under a hard 30 s deadline with a size cap (also for Nominatim); single-flight waiters give up at the deadline. Regression test with a trickling fake response. |
+| A routing call could hang for **30 minutes** | Measured: OSRM trickled a response; `requests` timeouts only bound each read. Single flight made 3 more requests wait as long. | Initial mitigation streamed under a checked deadline with a size cap. Independent review found a blocking-chunk defect; v1.2 replaces this with owned cancellable processes and real HTTP regression tests. |
 | Concurrent identical uncached requests could each call OSRM | Code review | Single flight per route key, tested with 8 threads (exactly 1 call) |
 | Published numbers didn't add up by hand | 6 of 30 real plans: stop costs ≠ trip cost by 1 cent; 11 had a ledger rebuilt from displayed values going over 50 gal | Per-purchase cent rounding in `Decimal`; ledger built from rounded fuel levels; per-leg fuel published; property test over 300 random plans |
 | Starting-fuel value depended on the confidence filter | The `medium` filter appeared cheaper than no filter on real routes | Valued against the full corridor; monotonicity tested |

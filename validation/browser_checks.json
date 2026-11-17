@@ -1,0 +1,16 @@
+{
+  "checks": {
+    "desktop_route_markers_legend_stop_popup": true,
+    "draggable_divider": {
+      "before": 452,
+      "after": 526
+    },
+    "saved_plan_reload_and_json_link": true,
+    "mobile_map_list_tabs": true,
+    "loaded_map_tiles": 25,
+    "map_library_failure_keeps_trip_details": true,
+    "controlled_error_display": true
+  },
+  "javascript_errors": [],
+  "passed": true
+}

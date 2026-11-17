@@ -1,0 +1,66 @@
+[
+  {
+    "scenario": "normal-default-rate-limit",
+    "requests": {
+      "total": 14,
+      "pending": 0,
+      "failed": 0
+    },
+    "assertions": {
+      "total": 50,
+      "pending": 0,
+      "failed": 0
+    },
+    "failures": [],
+    "statuses": [
+      200,
+      201,
+      201,
+      201,
+      201,
+      201,
+      201,
+      200,
+      200,
+      400,
+      422,
+      400,
+      422,
+      422
+    ]
+  },
+  {
+    "scenario": "connection-refused-503",
+    "requests": {
+      "total": 1,
+      "pending": 0,
+      "failed": 0
+    },
+    "assertions": {
+      "total": 1,
+      "pending": 0,
+      "failed": 0
+    },
+    "failures": [],
+    "statuses": [
+      503
+    ]
+  },
+  {
+    "scenario": "slow-stream-504",
+    "requests": {
+      "total": 1,
+      "pending": 0,
+      "failed": 0
+    },
+    "assertions": {
+      "total": 1,
+      "pending": 0,
+      "failed": 0
+    },
+    "failures": [],
+    "statuses": [
+      504
+    ]
+  }
+]

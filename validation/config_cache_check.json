@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "startup_ms": 6203.3,
+  "old_mpg": 10,
+  "new_mpg": 20,
+  "old_cost": 306.55,
+  "new_cost": 153.28,
+  "changed_plan_cache_hit": false,
+  "repeat_plan_cache_hit": true,
+  "routing_calls": [
+    0,
+    0
+  ]
+}

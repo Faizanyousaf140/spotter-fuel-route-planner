@@ -61,8 +61,9 @@ def stop_reason(stop: PlannedStop) -> str:
     if stop.decision == DECISION_REACH_EQUAL:
         return f"Bought only enough to reach {where}, which has the same price (${nxt.price:.3f}/gal)."
     if stop.decision == DECISION_FILL_UP:
-        return (f"Filled the tank: no cheaper station is reachable within range, and the next stop, {where}, "
-                f"costs more (${nxt.price:.3f} vs ${stop.candidate.price:.3f}/gal).")
+        return (f"Filled the tank as part of the minimum-cost plan, accounting for fuel prices and estimated "
+                f"station detours. The selected next stop, {where}, costs more "
+                f"(${nxt.price:.3f} vs ${stop.candidate.price:.3f}/gal).")
     return stop.decision  # pragma: no cover
 
 

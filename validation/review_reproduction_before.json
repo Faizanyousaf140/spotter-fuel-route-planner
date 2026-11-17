@@ -1,0 +1,63 @@
+{
+  "4_config_cache": {
+    "configured_mpg": 20,
+    "returned_mpg": 10.0,
+    "cache_hit": true
+  },
+  "6_fingerprint": {
+    "returned_name": "MIDDLE",
+    "returned_confidence": "high",
+    "cache_hit": true
+  },
+  "5_reload": {
+    "db_stations": 6620,
+    "memory_stations": 2,
+    "same_index": true
+  },
+  "3_country": {
+    "Windsor": "accepted",
+    "Tijuana": "accepted",
+    "Yellowstone": "LocationOutsideUSA",
+    "Alaska": "LocationOutsideUSA",
+    "Hawaii": "accepted"
+  },
+  "2_geometry": {
+    "actual_distance_miles": 0.848,
+    "old_distance_miles": 1.555,
+    "corridor_miles": 1,
+    "matched_ids": []
+  },
+  "1_deadline": {
+    "configured_total_seconds": 0.15,
+    "elapsed_seconds": 0.979,
+    "exception": "RoutingTimeout",
+    "http_status": 504
+  },
+  "7_read_timeout": {
+    "configured_total_seconds": 1,
+    "elapsed_seconds": 0.129,
+    "exception": "RoutingUnavailable",
+    "http_status": 503
+  },
+  "8_explanation": {
+    "cheaper_station_distance": 265,
+    "reason": "Filled the tank: no cheaper station is reachable within range, and the next stop, B (Testville, TX) at mile 700, costs more ($3.100 vs $3.000/gal)."
+  },
+  "9_geocoder": {
+    "exception": "KeyError"
+  },
+  "9_extreme_coordinate": {
+    "status": 500,
+    "body": {
+      "error": {
+        "code": "internal_error",
+        "message": "An unexpected error occurred.",
+        "details": {}
+      }
+    }
+  },
+  "10_loom": {
+    "blanket_no_geocoding_claim": true,
+    "never_empty_claim": true
+  }
+}

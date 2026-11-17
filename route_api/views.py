@@ -105,9 +105,13 @@ def route_map(request, plan_id):
         "plan_url": request.build_absolute_uri(reverse("route-plan-detail", args=[plan.id])),
         **plan.response,
     }
-    return render(request, "route_api/app.html", {"plan": plan, "data": data})
+    return render(request, "route_api/app.html", {"plan": plan, "data": data,
+        "vehicle_range_miles": settings.FUEL_PLANNER["VEHICLE_RANGE_MILES"],
+        "vehicle_mpg": settings.FUEL_PLANNER["VEHICLE_MPG"]})
 
 
 def demo_page(request):
     """GET / - the planner app (form, results, map). ?start=..&finish=.. plans immediately."""
-    return render(request, "route_api/app.html", {"data": None})
+    return render(request, "route_api/app.html", {"data": None,
+        "vehicle_range_miles": settings.FUEL_PLANNER["VEHICLE_RANGE_MILES"],
+        "vehicle_mpg": settings.FUEL_PLANNER["VEHICLE_MPG"]})

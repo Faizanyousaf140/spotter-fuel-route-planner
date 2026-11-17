@@ -1,6 +1,43 @@
 import uuid
 
-from django.db import models
+from django.db import models, transaction
+from django.db.models import F
+
+
+class StationDatasetRevision(models.Model):
+    """A singleton committed atomically with every supported station write."""
+
+    id = models.PositiveSmallIntegerField(primary_key=True, default=1, editable=False)
+    generation = models.PositiveBigIntegerField(default=1)
+
+
+def _bump_station_revision():
+    changed = StationDatasetRevision.objects.filter(pk=1).update(generation=F("generation") + 1)
+    if not changed:
+        StationDatasetRevision.objects.get_or_create(pk=1)
+
+
+class StationQuerySet(models.QuerySet):
+    def update(self, **kwargs):
+        with transaction.atomic(using=self.db):
+            count = super().update(**kwargs)
+            if count:
+                _bump_station_revision()
+            return count
+
+    def delete(self):
+        with transaction.atomic(using=self.db):
+            result = super().delete()
+            if result[0]:
+                _bump_station_revision()
+            return result
+
+    def bulk_create(self, objs, **kwargs):
+        with transaction.atomic(using=self.db):
+            result = super().bulk_create(objs, **kwargs)
+            if result:
+                _bump_station_revision()
+            return result
 
 
 class FuelStation(models.Model):
@@ -31,6 +68,19 @@ class FuelStation(models.Model):
     longitude = models.FloatField()
     geocode_source = models.CharField(max_length=48)
     geocode_match = models.CharField(max_length=128, blank=True)
+
+    objects = StationQuerySet.as_manager()
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            super().save(*args, **kwargs)
+            _bump_station_revision()
+
+    def delete(self, *args, **kwargs):
+        with transaction.atomic():
+            result = super().delete(*args, **kwargs)
+            _bump_station_revision()
+            return result
 
     class Meta:
         ordering = ["opis_id"]

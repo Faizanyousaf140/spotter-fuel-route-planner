@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
 from .services.geo import is_valid_coordinate
+from .services.geocoding_service import parse_coordinates
 
 
 class LocationField(serializers.Field):
@@ -24,6 +25,9 @@ class LocationField(serializers.Field):
                 self.fail("blank")
             if len(value) > 200:
                 self.fail("max_length")
+            coords = parse_coordinates(value)
+            if coords is not None and not is_valid_coordinate(*coords):
+                self.fail("coordinates")
             return value
         if isinstance(data, dict):
             lat = data.get("lat")

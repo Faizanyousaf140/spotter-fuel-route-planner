@@ -1,0 +1,23 @@
+{
+  "runs": [
+    {
+      "returncode": 0,
+      "tests": 178,
+      "suite_seconds": 38.425,
+      "elapsed_seconds": 44.862,
+      "live_enabled": false,
+      "skipped": 3,
+      "passed": true
+    },
+    {
+      "returncode": 0,
+      "tests": 178,
+      "suite_seconds": 60.402,
+      "elapsed_seconds": 66.488,
+      "live_enabled": true,
+      "skipped": 0,
+      "passed": true
+    }
+  ],
+  "passed": true
+}

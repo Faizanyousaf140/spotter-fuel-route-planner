@@ -1,0 +1,682 @@
+{
+  "route_audit": [
+    {
+      "start": "New York, NY",
+      "finish": "Los Angeles, CA",
+      "passed": true,
+      "distance_miles": 2810.5,
+      "stops": 9,
+      "total_cost": 874.84,
+      "longest_leg_miles": 454.35,
+      "routing_calls": 1,
+      "elapsed_ms": 6831.7,
+      "timings_ms": {
+        "resolve_locations": 1.8,
+        "station_index": 1.8,
+        "routing": 5757.0,
+        "station_matching": 641.6,
+        "fuel_optimization": 56.4,
+        "response_geometry": 273.4,
+        "total_request": 6756.1
+      },
+      "plan_id": "55d0c2ce-3b9a-4fcf-b928-7b7492d50ba0"
+    },
+    {
+      "start": "Chicago, IL",
+      "finish": "Dallas, TX",
+      "passed": true,
+      "distance_miles": 961.5,
+      "stops": 3,
+      "total_cost": 306.55,
+      "longest_leg_miles": 376.81,
+      "routing_calls": 1,
+      "elapsed_ms": 4371.4,
+      "timings_ms": {
+        "resolve_locations": 0.2,
+        "station_index": 1.4,
+        "routing": 4040.1,
+        "station_matching": 225.5,
+        "fuel_optimization": 17.1,
+        "response_geometry": 52.8,
+        "total_request": 4344.6
+      },
+      "plan_id": "440e3eb5-6857-45b0-9896-2ebd424c2e5a"
+    },
+    {
+      "start": "Washington, DC",
+      "finish": "New York, NY",
+      "passed": true,
+      "distance_miles": 225.6,
+      "stops": 0,
+      "total_cost": 83.45,
+      "longest_leg_miles": 225.6,
+      "routing_calls": 1,
+      "elapsed_ms": 2515.4,
+      "timings_ms": {
+        "resolve_locations": 0.2,
+        "station_index": 1.9,
+        "routing": 2236.5,
+        "station_matching": 208.9,
+        "fuel_optimization": 1.8,
+        "response_geometry": 25.4,
+        "total_request": 2480.5
+      },
+      "plan_id": "842498d6-cada-4eab-aed1-09885e0cd325"
+    },
+    {
+      "start": "Seattle, WA",
+      "finish": "Miami, FL",
+      "passed": true,
+      "distance_miles": 3302.9,
+      "stops": 12,
+      "total_cost": 1046.8,
+      "longest_leg_miles": 470.74,
+      "routing_calls": 1,
+      "elapsed_ms": 4372.3,
+      "timings_ms": {
+        "resolve_locations": 0.3,
+        "station_index": 1.6,
+        "routing": 3655.0,
+        "station_matching": 441.8,
+        "fuel_optimization": 22.1,
+        "response_geometry": 200.6,
+        "total_request": 4338.6
+      },
+      "plan_id": "65773c17-fe24-4550-b40a-79992d8c2d8e"
+    },
+    {
+      "start": "Boston, MA",
+      "finish": "San Francisco, CA",
+      "passed": true,
+      "distance_miles": 3140.7,
+      "stops": 10,
+      "total_cost": 1031.86,
+      "longest_leg_miles": 490.94,
+      "routing_calls": 1,
+      "elapsed_ms": 12975.4,
+      "timings_ms": {
+        "resolve_locations": 0.2,
+        "station_index": 1.2,
+        "routing": 12022.6,
+        "station_matching": 579.2,
+        "fuel_optimization": 43.9,
+        "response_geometry": 263.3,
+        "total_request": 12929.4
+      },
+      "plan_id": "63fe4681-9daf-41c6-94bf-3c82512971d5"
+    },
+    {
+      "start": "Portland, OR",
+      "finish": "Denver, CO",
+      "passed": true,
+      "distance_miles": 1243.7,
+      "stops": 5,
+      "total_cost": 435.64,
+      "longest_leg_miles": 400.47,
+      "routing_calls": 1,
+      "elapsed_ms": 3585.3,
+      "timings_ms": {
+        "resolve_locations": 0.3,
+        "station_index": 3.0,
+        "routing": 3223.7,
+        "station_matching": 145.6,
+        "fuel_optimization": 4.9,
+        "response_geometry": 142.2,
+        "total_request": 3534.8
+      },
+      "plan_id": "cbacd274-801a-40c3-b9ff-676b7e3b6214"
+    },
+    {
+      "start": "Denver, CO",
+      "finish": "Atlanta, GA",
+      "passed": true,
+      "distance_miles": 1393.8,
+      "stops": 4,
+      "total_cost": 426.66,
+      "longest_leg_miles": 479.89,
+      "routing_calls": 1,
+      "elapsed_ms": 3619.2,
+      "timings_ms": {
+        "resolve_locations": 0.3,
+        "station_index": 2.1,
+        "routing": 3095.5,
+        "station_matching": 335.1,
+        "fuel_optimization": 11.6,
+        "response_geometry": 115.9,
+        "total_request": 3573.6
+      },
+      "plan_id": "e8e8ab6a-0a5f-40a9-87c6-4b7f5c346784"
+    },
+    {
+      "start": "Houston, TX",
+      "finish": "Phoenix, AZ",
+      "passed": true,
+      "distance_miles": 1185.3,
+      "stops": 3,
+      "total_cost": 347.18,
+      "longest_leg_miles": 451.55,
+      "routing_calls": 1,
+      "elapsed_ms": 3088.6,
+      "timings_ms": {
+        "resolve_locations": 0.3,
+        "station_index": 2.1,
+        "routing": 2809.0,
+        "station_matching": 149.2,
+        "fuel_optimization": 4.1,
+        "response_geometry": 68.5,
+        "total_request": 3045.0
+      },
+      "plan_id": "aa99bb33-681f-4cda-8f11-1074ec09afc5"
+    },
+    {
+      "start": "Minneapolis, MN",
+      "finish": "New Orleans, LA",
+      "passed": true,
+      "distance_miles": 1220.6,
+      "stops": 3,
+      "total_cost": 390.48,
+      "longest_leg_miles": 432.65,
+      "routing_calls": 1,
+      "elapsed_ms": 4238.1,
+      "timings_ms": {
+        "resolve_locations": 0.3,
+        "station_index": 2.0,
+        "routing": 3724.0,
+        "station_matching": 355.9,
+        "fuel_optimization": 14.3,
+        "response_geometry": 89.7,
+        "total_request": 4198.0
+      },
+      "plan_id": "c072bc0a-f084-4b98-b03d-9dabc755fa33"
+    },
+    {
+      "start": "Detroit, MI",
+      "finish": "Nashville, TN",
+      "passed": true,
+      "distance_miles": 532.7,
+      "stops": 1,
+      "total_cost": 184.71,
+      "longest_leg_miles": 379.51,
+      "routing_calls": 1,
+      "elapsed_ms": 3267.2,
+      "timings_ms": {
+        "resolve_locations": 0.2,
+        "station_index": 1.6,
+        "routing": 2997.0,
+        "station_matching": 180.6,
+        "fuel_optimization": 6.5,
+        "response_geometry": 37.3,
+        "total_request": 3231.2
+      },
+      "plan_id": "922e07a1-7395-4f17-98ba-fc976bce068c"
+    },
+    {
+      "start": "Las Vegas, NV",
+      "finish": "Salt Lake City, UT",
+      "passed": true,
+      "distance_miles": 429.3,
+      "stops": 0,
+      "total_cost": 144.05,
+      "longest_leg_miles": 429.27,
+      "routing_calls": 1,
+      "elapsed_ms": 2049.1,
+      "timings_ms": {
+        "resolve_locations": 0.2,
+        "station_index": 1.3,
+        "routing": 1925.7,
+        "station_matching": 41.2,
+        "fuel_optimization": 0.6,
+        "response_geometry": 30.3,
+        "total_request": 2005.6
+      },
+      "plan_id": "0cde4b0c-780e-4ec1-91a6-766a5f1c98f4"
+    },
+    {
+      "start": "Albuquerque, NM",
+      "finish": "Oklahoma City, OK",
+      "passed": true,
+      "distance_miles": 544.0,
+      "stops": 1,
+      "total_cost": 172.51,
+      "longest_leg_miles": 286.92,
+      "routing_calls": 1,
+      "elapsed_ms": 2571.5,
+      "timings_ms": {
+        "resolve_locations": 0.4,
+        "station_index": 2.5,
+        "routing": 2465.8,
+        "station_matching": 42.0,
+        "fuel_optimization": 1.3,
+        "response_geometry": 15.0,
+        "total_request": 2531.5
+      },
+      "plan_id": "d1fd71b7-524f-4355-9db3-1b793f193f1c"
+    },
+    {
+      "start": "Charlotte, NC",
+      "finish": "Tampa, FL",
+      "passed": true,
+      "distance_miles": 580.6,
+      "stops": 1,
+      "total_cost": 190.33,
+      "longest_leg_miles": 347.11,
+      "routing_calls": 1,
+      "elapsed_ms": 3322.9,
+      "timings_ms": {
+        "resolve_locations": 0.7,
+        "station_index": 1.0,
+        "routing": 3116.2,
+        "station_matching": 128.3,
+        "fuel_optimization": 6.8,
+        "response_geometry": 39.4,
+        "total_request": 3300.3
+      },
+      "plan_id": "6f6afb28-b88a-46b9-a779-4edb088209b4"
+    },
+    {
+      "start": "Pittsburgh, PA",
+      "finish": "Kansas City, MO",
+      "passed": true,
+      "distance_miles": 843.5,
+      "stops": 3,
+      "total_cost": 298.52,
+      "longest_leg_miles": 264.35,
+      "routing_calls": 1,
+      "elapsed_ms": 4407.1,
+      "timings_ms": {
+        "resolve_locations": 1.6,
+        "station_index": 2.5,
+        "routing": 3750.1,
+        "station_matching": 278.2,
+        "fuel_optimization": 11.0,
+        "response_geometry": 83.1,
+        "total_request": 4142.7
+      },
+      "plan_id": "6d885893-d425-4c41-b1e8-76a7d7e3b745"
+    },
+    {
+      "start": "Indianapolis, IN",
+      "finish": "Memphis, TN",
+      "passed": true,
+      "distance_miles": 472.2,
+      "stops": 0,
+      "total_cost": 149.16,
+      "longest_leg_miles": 472.16,
+      "routing_calls": 1,
+      "elapsed_ms": 2795.4,
+      "timings_ms": {
+        "resolve_locations": 2.1,
+        "station_index": 1.9,
+        "routing": 2627.0,
+        "station_matching": 86.4,
+        "fuel_optimization": 1.0,
+        "response_geometry": 32.8,
+        "total_request": 2757.5
+      },
+      "plan_id": "28720ffd-a85a-4a5e-9f17-399d8a2afc78"
+    },
+    {
+      "start": "Cleveland, OH",
+      "finish": "Richmond, VA",
+      "passed": true,
+      "distance_miles": 440.3,
+      "stops": 0,
+      "total_cost": 165.81,
+      "longest_leg_miles": 440.33,
+      "routing_calls": 1,
+      "elapsed_ms": 2607.0,
+      "timings_ms": {
+        "resolve_locations": 1.2,
+        "station_index": 1.7,
+        "routing": 2291.5,
+        "station_matching": 197.9,
+        "fuel_optimization": 1.8,
+        "response_geometry": 69.0,
+        "total_request": 2574.5
+      },
+      "plan_id": "2da04fe0-9f7e-4880-b929-37d2801e94ae"
+    },
+    {
+      "start": "Milwaukee, WI",
+      "finish": "Austin, TX",
+      "passed": true,
+      "distance_miles": 1200.3,
+      "stops": 3,
+      "total_cost": 372.43,
+      "longest_leg_miles": 415.68,
+      "routing_calls": 1,
+      "elapsed_ms": 2811.7,
+      "timings_ms": {
+        "resolve_locations": 1.3,
+        "station_index": 2.0,
+        "routing": 2256.5,
+        "station_matching": 318.6,
+        "fuel_optimization": 22.8,
+        "response_geometry": 127.0,
+        "total_request": 2780.0
+      },
+      "plan_id": "075e3360-6008-47c3-95ad-c040597c06e9"
+    },
+    {
+      "start": "Boise, ID",
+      "finish": "Sacramento, CA",
+      "passed": true,
+      "distance_miles": 551.1,
+      "stops": 1,
+      "total_cost": 186.98,
+      "longest_leg_miles": 296.57,
+      "routing_calls": 1,
+      "elapsed_ms": 2327.1,
+      "timings_ms": {
+        "resolve_locations": 0.5,
+        "station_index": 1.1,
+        "routing": 2089.0,
+        "station_matching": 92.8,
+        "fuel_optimization": 1.3,
+        "response_geometry": 59.6,
+        "total_request": 2302.9
+      },
+      "plan_id": "54755e43-0996-4af4-a226-95e71d20aa87"
+    },
+    {
+      "start": "Omaha, NE",
+      "finish": "Birmingham, AL",
+      "passed": true,
+      "distance_miles": 875.7,
+      "stops": 2,
+      "total_cost": 257.55,
+      "longest_leg_miles": 363.47,
+      "routing_calls": 1,
+      "elapsed_ms": 3121.7,
+      "timings_ms": {
+        "resolve_locations": 1.9,
+        "station_index": 2.1,
+        "routing": 2803.3,
+        "station_matching": 172.5,
+        "fuel_optimization": 8.8,
+        "response_geometry": 84.3,
+        "total_request": 3081.4
+      },
+      "plan_id": "08545cbc-75a5-4699-a5c9-64ce9e99d5d4"
+    },
+    {
+      "start": "St. Louis, MO",
+      "finish": "Jacksonville, FL",
+      "passed": true,
+      "distance_miles": 900.2,
+      "stops": 1,
+      "total_cost": 258.22,
+      "longest_leg_miles": 460.64,
+      "routing_calls": 1,
+      "elapsed_ms": 2977.2,
+      "timings_ms": {
+        "resolve_locations": 0.8,
+        "station_index": 1.4,
+        "routing": 2638.8,
+        "station_matching": 198.8,
+        "fuel_optimization": 11.5,
+        "response_geometry": 61.4,
+        "total_request": 2922.4
+      },
+      "plan_id": "5cc58afd-9c9d-47d3-9039-95bc5523b4c7"
+    },
+    {
+      "start": "Buffalo, NY",
+      "finish": "Louisville, KY",
+      "passed": true,
+      "distance_miles": 536.4,
+      "stops": 1,
+      "total_cost": 197.72,
+      "longest_leg_miles": 448.72,
+      "routing_calls": 1,
+      "elapsed_ms": 2558.2,
+      "timings_ms": {
+        "resolve_locations": 0.9,
+        "station_index": 1.4,
+        "routing": 2314.5,
+        "station_matching": 124.6,
+        "fuel_optimization": 4.0,
+        "response_geometry": 46.9,
+        "total_request": 2501.5
+      },
+      "plan_id": "157f38c5-72e8-4b95-9e7f-e9909d5a18aa"
+    },
+    {
+      "start": "Raleigh, NC",
+      "finish": "Columbus, OH",
+      "passed": true,
+      "distance_miles": 473.4,
+      "stops": 0,
+      "total_cost": 170.36,
+      "longest_leg_miles": 473.35,
+      "routing_calls": 1,
+      "elapsed_ms": 2701.9,
+      "timings_ms": {
+        "resolve_locations": 0.5,
+        "station_index": 1.4,
+        "routing": 2441.7,
+        "station_matching": 171.5,
+        "fuel_optimization": 0.6,
+        "response_geometry": 48.0,
+        "total_request": 2669.6
+      },
+      "plan_id": "b958934d-f10b-4bc9-b051-ea373956c1e2"
+    },
+    {
+      "start": "San Antonio, TX",
+      "finish": "El Paso, TX",
+      "passed": true,
+      "distance_miles": 551.3,
+      "stops": 1,
+      "total_cost": 155.56,
+      "longest_leg_miles": 348.63,
+      "routing_calls": 1,
+      "elapsed_ms": 2308.6,
+      "timings_ms": {
+        "resolve_locations": 1.0,
+        "station_index": 1.2,
+        "routing": 2121.6,
+        "station_matching": 100.4,
+        "fuel_optimization": 1.5,
+        "response_geometry": 34.4,
+        "total_request": 2267.1
+      },
+      "plan_id": "c337b7f6-e104-4d52-82b5-3db7ce923a6a"
+    },
+    {
+      "start": "Reno, NV",
+      "finish": "Spokane, WA",
+      "passed": true,
+      "distance_miles": 790.3,
+      "stops": 2,
+      "total_cost": 294.16,
+      "longest_leg_miles": 425.88,
+      "routing_calls": 1,
+      "elapsed_ms": 2408.2,
+      "timings_ms": {
+        "resolve_locations": 2.5,
+        "station_index": 3.7,
+        "routing": 2161.7,
+        "station_matching": 65.5,
+        "fuel_optimization": 2.0,
+        "response_geometry": 49.1,
+        "total_request": 2295.7
+      },
+      "plan_id": "055011a1-9b1d-471c-96d3-a8c6584707d9"
+    },
+    {
+      "start": "Billings, MT",
+      "finish": "Fargo, ND",
+      "passed": true,
+      "distance_miles": 610.0,
+      "stops": 1,
+      "total_cost": 217.28,
+      "longest_leg_miles": 388.72,
+      "routing_calls": 1,
+      "elapsed_ms": 2479.4,
+      "timings_ms": {
+        "resolve_locations": 0.7,
+        "station_index": 1.8,
+        "routing": 2344.6,
+        "station_matching": 49.8,
+        "fuel_optimization": 1.7,
+        "response_geometry": 44.6,
+        "total_request": 2450.2
+      },
+      "plan_id": "f40bcae5-089d-4d94-83cf-8487b71f50d7"
+    },
+    {
+      "start": "Little Rock, AR",
+      "finish": "Charleston, SC",
+      "passed": true,
+      "distance_miles": 819.0,
+      "stops": 2,
+      "total_cost": 244.75,
+      "longest_leg_miles": 347.42,
+      "routing_calls": 1,
+      "elapsed_ms": 3127.8,
+      "timings_ms": {
+        "resolve_locations": 0.9,
+        "station_index": 1.6,
+        "routing": 2793.6,
+        "station_matching": 201.3,
+        "fuel_optimization": 14.7,
+        "response_geometry": 71.3,
+        "total_request": 3092.6
+      },
+      "plan_id": "ca9f7d07-c7e7-4d1f-a11c-c3c0969bc703"
+    },
+    {
+      "start": "Burlington, VT",
+      "finish": "Harrisburg, PA",
+      "passed": true,
+      "distance_miles": 450.9,
+      "stops": 0,
+      "total_cost": 162.28,
+      "longest_leg_miles": 450.9,
+      "routing_calls": 1,
+      "elapsed_ms": 2942.7,
+      "timings_ms": {
+        "resolve_locations": 1.5,
+        "station_index": 2.1,
+        "routing": 2617.7,
+        "station_matching": 195.8,
+        "fuel_optimization": 0.9,
+        "response_geometry": 68.0,
+        "total_request": 2894.0
+      },
+      "plan_id": "88384738-ea32-46f1-ae36-87537d6161b5"
+    },
+    {
+      "start": "Baltimore, MD",
+      "finish": "Savannah, GA",
+      "passed": true,
+      "distance_miles": 626.1,
+      "stops": 2,
+      "total_cost": 197.51,
+      "longest_leg_miles": 325.67,
+      "routing_calls": 1,
+      "elapsed_ms": 2922.0,
+      "timings_ms": {
+        "resolve_locations": 0.9,
+        "station_index": 2.2,
+        "routing": 2468.3,
+        "station_matching": 259.0,
+        "fuel_optimization": 15.1,
+        "response_geometry": 133.8,
+        "total_request": 2890.7
+      },
+      "plan_id": "20259b53-d2cd-4036-b8ca-71bdb71e56ca"
+    },
+    {
+      "start": "Wichita, KS",
+      "finish": "Baton Rouge, LA",
+      "passed": true,
+      "distance_miles": 762.9,
+      "stops": 1,
+      "total_cost": 236.04,
+      "longest_leg_miles": 487.41,
+      "routing_calls": 1,
+      "elapsed_ms": 2926.6,
+      "timings_ms": {
+        "resolve_locations": 0.7,
+        "station_index": 1.5,
+        "routing": 2673.2,
+        "station_matching": 140.0,
+        "fuel_optimization": 4.9,
+        "response_geometry": 54.0,
+        "total_request": 2883.0
+      },
+      "plan_id": "087bb232-d218-4279-bfda-67e3c03e8e42"
+    },
+    {
+      "start": "Nashville, TN",
+      "finish": "Phoenix, AZ",
+      "passed": true,
+      "distance_miles": 1674.8,
+      "stops": 6,
+      "total_cost": 494.15,
+      "longest_leg_miles": 493.52,
+      "routing_calls": 1,
+      "elapsed_ms": 3272.8,
+      "timings_ms": {
+        "resolve_locations": 0.2,
+        "station_index": 1.3,
+        "routing": 2665.5,
+        "station_matching": 426.6,
+        "fuel_optimization": 12.7,
+        "response_geometry": 106.5,
+        "total_request": 3224.6
+      },
+      "plan_id": "6e273d88-f85f-473d-88d8-8970dbf226d1"
+    }
+  ],
+  "benchmarks": {
+    "cold_30_different_routes": {
+      "requests": 30,
+      "p50_ms": 2959.9,
+      "p95_ms": 6831.7,
+      "min_ms": 2049.1,
+      "max_ms": 12975.4
+    },
+    "warm": {
+      "requests": 15,
+      "p50_ms": 58.5,
+      "p95_ms": 153.4,
+      "min_ms": 37.0,
+      "max_ms": 153.4
+    },
+    "concurrent_cached_8_clients_48_requests": {
+      "requests": 48,
+      "p50_ms": 176.5,
+      "p95_ms": 752.2,
+      "min_ms": 63.7,
+      "max_ms": 1294.4,
+      "requests_per_second": 26.1,
+      "routing_calls": 0
+    },
+    "concurrent_identical_uncached_4_clients": {
+      "clients": 4,
+      "total_external_routing_calls": 1,
+      "total_elapsed_ms": 4078.4,
+      "latencies_ms": [
+        4043.2,
+        4065.3,
+        4010.8,
+        4068.9
+      ],
+      "plan_cache_hits": [
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "optimizer": {
+    "cases": 20000,
+    "feasible": 6951,
+    "mismatches": 0,
+    "elapsed_seconds": 4.764
+  }
+}

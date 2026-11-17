@@ -1,0 +1,39 @@
+[
+  {
+    "scenario": "slow",
+    "budget_seconds": 0.8,
+    "elapsed_ms": 825.8,
+    "http_status": 504,
+    "external_requests": 1,
+    "workers_remaining": 0
+  },
+  {
+    "scenario": "headers",
+    "budget_seconds": 0.8,
+    "elapsed_ms": 813.4,
+    "http_status": 504,
+    "external_requests": 1,
+    "workers_remaining": 0
+  },
+  {
+    "scenario": "stall",
+    "budget_seconds": 2,
+    "elapsed_ms": 522.3,
+    "http_status": 504,
+    "external_requests": 1,
+    "workers_remaining": 0
+  },
+  {
+    "scenario": "4 concurrent identical trickling requests",
+    "budget_seconds": 0.8,
+    "elapsed_ms": 814.3,
+    "http_statuses": [
+      504,
+      504,
+      504,
+      504
+    ],
+    "external_requests": 1,
+    "workers_remaining": 0
+  }
+]

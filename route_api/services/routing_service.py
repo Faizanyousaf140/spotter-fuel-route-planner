@@ -18,7 +18,7 @@ import logging
 import threading
 import time
 import zlib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 import requests
@@ -28,11 +28,12 @@ from django.core.cache import cache
 from .errors import RouteNotFound, RoutingProviderError, RoutingTimeout, RoutingUnavailable
 from .geo import METERS_PER_MILE, decode_polyline_array
 from .highways import RoadSegment, route_ref_tokens
-from .http_utils import DeadlineExceeded, ResponseTooLarge, read_with_deadline
+from .http_utils import (DeadlineExceeded, ResponseTooLarge, is_timeout_error,
+                         remaining_seconds, request_with_deadline)
 
 logger = logging.getLogger(__name__)
 
-CACHE_VERSION = "v3"
+CACHE_VERSION = "v4"
 CACHE_PRECISION = 5  # ~1 m; coordinates are rounded to this many decimals for the cache key
 MAX_RESPONSE_BYTES = 20 * 1024 * 1024  # a coast-to-coast OSRM answer is ~0.6 MB
 
@@ -67,23 +68,30 @@ class RoutingProvider:
     def route(self, start: tuple[float, float], finish: tuple[float, float]) -> RouteResult:
         raise NotImplementedError
 
-    def _respect_min_interval(self) -> None:
+    def _respect_min_interval(self, deadline: float) -> None:
         interval = float(self.cfg.get("ROUTING_MIN_INTERVAL_SECONDS") or 0)
         if interval <= 0:
             return
-        with RoutingProvider._spacing_lock:
+        if not RoutingProvider._spacing_lock.acquire(timeout=remaining_seconds(deadline)):
+            raise DeadlineExceeded("Timed out waiting for routing provider spacing")
+        try:
             wait = RoutingProvider._last_call_at + interval - time.monotonic()
             if wait > 0:
+                if wait >= remaining_seconds(deadline):
+                    raise DeadlineExceeded("Routing provider spacing exceeds the request deadline")
                 time.sleep(wait)
             RoutingProvider._last_call_at = time.monotonic()
+        finally:
+            RoutingProvider._spacing_lock.release()
 
-    def _send(self, method: str, url: str, **kwargs) -> requests.Response:
-        self._respect_min_interval()
-        deadline = time.monotonic() + self.total_timeout
+    def _send(self, method: str, url: str, *, deadline=None, **kwargs) -> requests.Response:
+        deadline = deadline if deadline is not None else time.monotonic() + self.total_timeout
         try:
+            self._respect_min_interval(deadline)
             headers = self.headers | kwargs.pop("headers", {})
-            response = self.session.request(method, url, timeout=self.timeout, headers=headers, stream=True, **kwargs)
-            return read_with_deadline(response, deadline, MAX_RESPONSE_BYTES)
+            return request_with_deadline(method, url, timeout=self.timeout, headers=headers,
+                                         session=self.session, deadline=deadline,
+                                         max_bytes=MAX_RESPONSE_BYTES, **kwargs)
         except DeadlineExceeded as exc:
             raise RoutingTimeout(
                 f"Routing provider ({self.name}) did not finish responding within {self.total_timeout:.0f} s.") from exc
@@ -92,6 +100,8 @@ class RoutingProvider:
         except requests.Timeout as exc:
             raise RoutingTimeout(f"Routing provider ({self.name}) timed out.") from exc
         except requests.RequestException as exc:
+            if is_timeout_error(exc):
+                raise RoutingTimeout(f"Routing provider ({self.name}) timed out.") from exc
             raise RoutingUnavailable(f"Routing provider ({self.name}) is unreachable.") from exc
 
     @staticmethod
@@ -121,7 +131,7 @@ class OSRMProvider(RoutingProvider):
     name = "osrm"
     NOT_FOUND_CODES = {"NoRoute", "NoSegment", "NoMatch"}
 
-    def route(self, start, finish):
+    def route(self, start, finish, *, deadline=None):
         url = (
             f"{self.cfg['OSRM_BASE_URL']}/route/v1/driving/"
             f"{start[1]:.6f},{start[0]:.6f};{finish[1]:.6f},{finish[0]:.6f}"
@@ -129,7 +139,7 @@ class OSRMProvider(RoutingProvider):
         # polyline6 + steps: smaller payload than GeoJSON (~615 KB vs ~820 KB coast to coast) and the
         # steps carry the highway refs ("I 80; US 6") used for location confidence. Still ONE request.
         params = {"overview": "full", "geometries": "polyline6", "alternatives": "false", "steps": "true"}
-        response = self._send("GET", url, params=params)
+        response = self._send("GET", url, params=params, deadline=deadline)
         if response.status_code == 429:
             raise RoutingUnavailable("Routing provider (osrm) rate limit reached; retry shortly.")
         data = self._json(response, self.name)
@@ -175,13 +185,13 @@ class OpenRouteServiceProvider(RoutingProvider):
     name = "openrouteservice"
     NOT_FOUND_CODES = {2009, 2010, 2004}  # route not found / point not routable / limit exceeded
 
-    def route(self, start, finish):
+    def route(self, start, finish, *, deadline=None):
         key = self.cfg.get("ORS_API_KEY")
         if not key:
             raise RoutingProviderError("ROUTING_PROVIDER=openrouteservice but ORS_API_KEY is not set.")
         url = f"{self.cfg['ORS_BASE_URL']}/v2/directions/driving-car/geojson"
         body = {"coordinates": [[start[1], start[0]], [finish[1], finish[0]]]}
-        response = self._send("POST", url, json=body, headers={"Authorization": key})
+        response = self._send("POST", url, json=body, headers={"Authorization": key}, deadline=deadline)
         if response.status_code == 429:
             raise RoutingUnavailable("Routing provider (openrouteservice) quota or rate limit reached.")
         data = self._json(response, self.name)
@@ -218,14 +228,23 @@ def get_provider(cfg: dict | None = None) -> RoutingProvider:
         raise RoutingProviderError(f"Unknown ROUTING_PROVIDER {cfg['ROUTING_PROVIDER']!r}.") from exc
 
 
-def route_cache_key(provider: str, start, finish) -> str:
+def route_cache_key(provider: str, start, finish, *, cfg=None) -> str:
+    cfg = cfg or settings.FUEL_PLANNER
+    endpoint = cfg.get("OSRM_BASE_URL" if provider == "osrm" else "ORS_BASE_URL", "")
     raw = f"{provider}:{start[0]:.{CACHE_PRECISION}f},{start[1]:.{CACHE_PRECISION}f};" \
-          f"{finish[0]:.{CACHE_PRECISION}f},{finish[1]:.{CACHE_PRECISION}f}"
+          f"{finish[0]:.{CACHE_PRECISION}f},{finish[1]:.{CACHE_PRECISION}f}:{endpoint}"
     return f"route:{CACHE_VERSION}:{hashlib.sha256(raw.encode()).hexdigest()[:32]}"
 
 
 _inflight_guard = threading.Lock()
-_inflight: dict[str, threading.Lock] = {}
+@dataclass
+class _Flight:
+    ready: threading.Event = field(default_factory=threading.Event)
+    result: RouteResult | None = None
+    error: Exception | None = None
+
+
+_inflight: dict[str, _Flight] = {}
 
 
 def _from_cache(key: str, provider_name: str) -> RouteResult | None:
@@ -248,33 +267,48 @@ def _from_cache(key: str, provider_name: str) -> RouteResult | None:
 def get_route(start: tuple[float, float], finish: tuple[float, float], provider: RoutingProvider | None = None) -> RouteResult:
     """Return the driving route, from cache when possible (0 calls) or 1 provider call."""
     provider = provider or get_provider()
-    key = route_cache_key(provider.name, start, finish)
+    deadline = time.monotonic() + provider.total_timeout
+    key = route_cache_key(provider.name, start, finish, cfg=provider.cfg)
     cached = _from_cache(key, provider.name)
     if cached:
         return cached
 
-    # Single flight: concurrent identical requests wait for the first one's result.
+    # Share both success and failure. Each waiter retains its own total budget;
+    # it cannot wait once and then begin another full-duration HTTP exchange.
     with _inflight_guard:
-        key_lock = _inflight.setdefault(key, threading.Lock())
-    # Waiters give up at the provider's total deadline instead of queueing indefinitely.
-    if not key_lock.acquire(timeout=provider.total_timeout + 5):
-        raise RoutingTimeout("Timed out waiting for an identical routing request in progress.")
+        flight = _inflight.get(key)
+        owner = flight is None
+        if owner:
+            flight = _inflight[key] = _Flight()
+    if not owner:
+        if not flight.ready.wait(max(0.0, deadline - time.monotonic())):
+            raise RoutingTimeout("Timed out waiting for an identical routing request in progress.")
+        if flight.error is not None:
+            if hasattr(flight.error, "message") and hasattr(flight.error, "details"):
+                raise type(flight.error)(flight.error.message, details=flight.error.details.copy())
+            raise RoutingProviderError("The shared routing request failed.") from flight.error
+        return replace(flight.result, from_cache=True, provider_calls=0)
     try:
         cached = _from_cache(key, provider.name)
         if cached:
+            flight.result = cached
             return cached
-        return _fetch_and_cache(key, provider, start, finish)
+        flight.result = _fetch_and_cache(key, provider, start, finish, deadline=deadline)
+        return flight.result
+    except Exception as exc:
+        flight.error = exc
+        raise
     finally:
-        key_lock.release()
         with _inflight_guard:
-            if _inflight.get(key) is key_lock:
+            flight.ready.set()
+            if _inflight.get(key) is flight:
                 _inflight.pop(key, None)
 
 
-def _fetch_and_cache(key: str, provider: RoutingProvider, start, finish) -> RouteResult:
+def _fetch_and_cache(key: str, provider: RoutingProvider, start, finish, *, deadline) -> RouteResult:
     t0 = time.perf_counter()
     try:
-        result = provider.route(start, finish)
+        result = provider.route(start, finish, deadline=deadline)
     finally:
         elapsed_ms = (time.perf_counter() - t0) * 1000
         logger.info("routing call provider=%s elapsed_ms=%.0f", provider.name, elapsed_ms)

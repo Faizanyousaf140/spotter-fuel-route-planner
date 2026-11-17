@@ -8,6 +8,7 @@ from django.db import DatabaseError
 from .services.errors import StationDataUnavailable
 from .services.gazetteer import get_place_index
 from .services.station_service import get_station_index
+from .services.us_boundaries import get_boundary_index
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ def warm_up() -> None:
     t0 = time.perf_counter()
     try:
         get_place_index()
+        get_boundary_index()
     except OSError as exc:
         logger.warning("Place reference not loaded at startup: %s", exc)
     try:

@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import copy
 import logging
+import hashlib
+import json
 import time
 from dataclasses import dataclass
 
@@ -28,11 +30,12 @@ from .highways import CONFIDENCE_LOW, CONFIDENCE_RANK, assess_location
 from .route_matching import build_route_profile, match_stations
 from .routing_service import get_route, route_cache_key
 from .station_service import get_station_index
+from .us_boundaries import BOUNDARY_VERSION
 
 logger = logging.getLogger(__name__)
 
 # Bump when the plan computation or the response format changes (invalidates cached plans).
-PLAN_CACHE_VERSION = "p2"
+PLAN_CACHE_VERSION = "p3"
 
 COORDINATE_WARNING = (
     "Station coordinates are approximate: the price file has no coordinates, so each station is placed at "
@@ -110,10 +113,21 @@ def plan_route(start_value, finish_value, *, corridor_miles: float | None = None
     index = get_station_index()
     timings["station_index"] = _ms(t)
 
-    # A computed plan depends only on (route, corridor, confidence filter, station data, code
-    # version), so an identical request is answered from the plan cache with no routing work.
+    # Cache the complete computation contract, including vehicle configuration,
+    # matching/output settings and versioned reference/station snapshots.
     route_key = route_cache_key(cfg["ROUTING_PROVIDER"], start.point, finish.point)
-    plan_key = f"plan:{PLAN_CACHE_VERSION}:{route_key}:{corridor:g}:{min_location_confidence}:{index.fingerprint}"
+    computation = {
+        "calculation_version": PLAN_CACHE_VERSION, "route_key": route_key,
+        "vehicle_mpg": mpg, "vehicle_range_miles": range_miles,
+        "corridor_miles": corridor, "default_corridor_miles": cfg["MAX_OFF_ROUTE_MILES"],
+        "min_location_confidence": min_location_confidence,
+        "sample_spacing_miles": cfg["ROUTE_SAMPLE_SPACING_MILES"],
+        "response_geometry_tolerance_deg": cfg["RESPONSE_GEOMETRY_TOLERANCE_DEG"],
+        "station_revision": index.revision, "station_fingerprint": index.fingerprint,
+        "us_boundary_version": BOUNDARY_VERSION,
+    }
+    plan_key = "plan:" + hashlib.sha256(json.dumps(computation, sort_keys=True,
+                                                  separators=(",", ":")).encode()).hexdigest()
     cached_response = cache.get(plan_key)
     if cached_response is not None:
         response = copy.deepcopy(cached_response)

@@ -1,0 +1,7 @@
+{
+  "passed": true,
+  "migration": "route_api.0003_stationdatasetrevision",
+  "stations_before": 6620,
+  "stations_after": 6620,
+  "backup": "var/before-hardening-migration.sqlite3"
+}

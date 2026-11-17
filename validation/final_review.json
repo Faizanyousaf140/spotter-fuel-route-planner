@@ -1,0 +1,286 @@
+{
+  "findings": [
+    {
+      "finding": 1,
+      "title": "Hard routing deadline",
+      "reproduced_before_modification": true,
+      "before": {
+        "1_deadline": {
+          "configured_total_seconds": 0.15,
+          "elapsed_seconds": 0.979,
+          "exception": "RoutingTimeout",
+          "http_status": 504
+        }
+      },
+      "root_cause": "Blocking response reads and unbounded single-flight/spacing waits.",
+      "files_changed": [
+        "route_api/services/http_utils.py",
+        "route_api/services/http_worker.py",
+        "route_api/services/routing_service.py",
+        "route_api/services/nominatim.py"
+      ],
+      "new_regression_tests": [
+        "test_real_trickling_body_is_bounded_and_worker_is_reaped",
+        "test_real_trickling_headers_are_in_total_deadline",
+        "test_concurrent_waiters_share_one_failed_real_request_and_deadline",
+        "test_spacing_lock_wait_uses_the_same_total_budget"
+      ],
+      "verification": "Real local HTTP and 0.8-second benchmark pass; one exchange for four waiters; all workers reaped.",
+      "remaining_limitation": "Bounded termination/response overhead follows the network budget; latest local measurements 13-26 ms. Single flight is per process.",
+      "confirmed_defect_resolved": true
+    },
+    {
+      "finding": 2,
+      "title": "Original route geometry",
+      "reproduced_before_modification": true,
+      "before": {
+        "2_geometry": {
+          "actual_distance_miles": 0.848,
+          "old_distance_miles": 1.555,
+          "corridor_miles": 1,
+          "matched_ids": []
+        }
+      },
+      "root_cause": "Two-mile downsampling removed original corners; nearest sampled neighbors missed valid segments.",
+      "files_changed": [
+        "route_api/services/route_matching.py"
+      ],
+      "new_regression_tests": [
+        "test_right_angle_original_distance_and_corner_mile_marker",
+        "test_provider_distance_scales_corner_marker_without_moving_projection",
+        "test_safe_grid_matches_all_segments_on_random_bends_and_parallel_roads"
+      ],
+      "verification": "0.848-mile station retained within 1 mile; marker and all-segment prefilter comparisons pass.",
+      "remaining_limitation": "City-point positions and local straight-line projection remain approximations.",
+      "confirmed_defect_resolved": true
+    },
+    {
+      "finding": 3,
+      "title": "Offline US boundary validation",
+      "reproduced_before_modification": true,
+      "before": {
+        "3_country": {
+          "Windsor": "accepted",
+          "Tijuana": "accepted",
+          "Yellowstone": "LocationOutsideUSA",
+          "Alaska": "LocationOutsideUSA",
+          "Hawaii": "accepted"
+        }
+      },
+      "root_cause": "Nearest Census place within 25 miles both admitted foreign cities and rejected remote US land.",
+      "files_changed": [
+        "route_api/services/us_boundaries.py",
+        "route_api/services/geocoding_service.py",
+        "data/reference/us_boundaries.json.gz",
+        "data/reference/us_boundaries.provenance.json",
+        "scripts/build_us_boundaries.py"
+      ],
+      "new_regression_tests": [
+        "test_foreign_border_cities_rejected_remote_states_accepted",
+        "test_holes_edges_islands_and_antimeridian",
+        "test_real_boundary_vertices_are_included"
+      ],
+      "verification": "Windsor/Tijuana rejected; Yellowstone, Alaska, Hawaii, Aleutians and US-side border cities accepted. Real API returns 422 for foreign coordinates.",
+      "remaining_limitation": "Census 1:500,000 land polygons are generalized; survey precision, offshore water and territories are outside scope.",
+      "confirmed_defect_resolved": true
+    },
+    {
+      "finding": 4,
+      "title": "Complete plan configuration key",
+      "reproduced_before_modification": true,
+      "before": {
+        "4_config_cache": {
+          "configured_mpg": 20,
+          "returned_mpg": 10.0,
+          "cache_hit": true
+        }
+      },
+      "root_cause": "Plan key omitted MPG/range and other computation settings.",
+      "files_changed": [
+        "route_api/services/planner.py",
+        "route_api/services/routing_service.py",
+        "route_api/views.py",
+        "route_api/templates/route_api/app.html"
+      ],
+      "new_regression_tests": [
+        "test_mpg_change_recomputes_and_then_hits_valid_cache",
+        "test_range_and_geometry_configuration_invalidate_plans"
+      ],
+      "verification": "10-to-20 MPG recomputes; live restart yields $153.28 vs $306.55, then valid plan hit; zero upstream calls from cached geometry. GUI checked at both configurations.",
+      "remaining_limitation": "Calculation and boundary versions must be bumped when their semantics/data change.",
+      "confirmed_defect_resolved": true
+    },
+    {
+      "finding": 5,
+      "title": "Cross-process station freshness",
+      "reproduced_before_modification": true,
+      "before": {
+        "5_reload": {
+          "db_stations": 6620,
+          "memory_stations": 2,
+          "same_index": true
+        }
+      },
+      "root_cause": "Process-global index was never checked against committed database updates.",
+      "files_changed": [
+        "route_api/models.py",
+        "route_api/migrations/0003_stationdatasetrevision.py",
+        "route_api/services/station_service.py"
+      ],
+      "new_regression_tests": [
+        "test_reload_refreshes_index_without_manual_reset",
+        "test_running_process_refreshes_after_another_process_loads_stations",
+        "test_rollback_revision_reuse_cannot_publish_uncommitted_index",
+        "test_reload_between_revision_reads_retries_a_coherent_snapshot"
+      ],
+      "verification": "Separate observer refreshes 1 to 6620 stations; rollback ABA and coherent snapshot regressions pass.",
+      "remaining_limitation": "Raw SQL must bump revision in the same transaction. Requests already using an old committed snapshot may finish with it.",
+      "confirmed_defect_resolved": true
+    },
+    {
+      "finding": 6,
+      "title": "Complete station fingerprint",
+      "reproduced_before_modification": true,
+      "before": {
+        "6_fingerprint": {
+          "returned_name": "MIDDLE",
+          "returned_confidence": "high",
+          "cache_hit": true
+        }
+      },
+      "root_cause": "Fingerprint omitted metadata that affects output and highway-confidence eligibility.",
+      "files_changed": [
+        "route_api/services/station_service.py",
+        "route_api/models.py"
+      ],
+      "new_regression_tests": [
+        "test_all_output_and_eligibility_fields_change_the_fingerprint",
+        "test_name_address_changes_refresh_index_and_cached_output_without_manual_reset",
+        "test_address_change_recomputes_high_confidence_eligibility"
+      ],
+      "verification": "Every StationRecord field independently invalidates fingerprint; renamed/address-changed output and confidence eligibility recompute.",
+      "remaining_limitation": "New output/eligibility fields must be added to the snapshot when introduced.",
+      "confirmed_defect_resolved": true
+    },
+    {
+      "finding": 7,
+      "title": "Read timeout status mapping",
+      "reproduced_before_modification": true,
+      "before": {
+        "7_read_timeout": {
+          "configured_total_seconds": 1,
+          "elapsed_seconds": 0.129,
+          "exception": "RoutingUnavailable",
+          "http_status": 503
+        }
+      },
+      "root_cause": "Requests wraps urllib3 read timeouts in ConnectionError, previously treated as connection failure.",
+      "files_changed": [
+        "route_api/services/http_utils.py",
+        "route_api/services/http_worker.py",
+        "route_api/services/routing_service.py"
+      ],
+      "new_regression_tests": [
+        "test_actual_body_read_timeout_maps_to_504",
+        "test_requests_wrapped_body_timeout_is_also_504",
+        "test_genuine_connection_refusal_stays_503"
+      ],
+      "verification": "Real stalled body and wrapped read timeout return 504; real connection refusal remains 503; Newman fault checks pass.",
+      "remaining_limitation": null,
+      "confirmed_defect_resolved": true
+    },
+    {
+      "finding": 8,
+      "title": "Truthful fill explanation",
+      "reproduced_before_modification": true,
+      "before": {
+        "8_explanation": {
+          "cheaper_station_distance": 265,
+          "reason": "Filled the tank: no cheaper station is reachable within range, and the next stop, B (Testville, TX) at mile 700, costs more ($3.100 vs $3.000/gal)."
+        }
+      },
+      "root_cause": "Explanation inferred global reachability from the chosen next stop, ignoring detour tradeoffs.",
+      "files_changed": [
+        "route_api/services/cost_calculator.py"
+      ],
+      "new_regression_tests": [
+        "test_cheaper_station_265_miles_away_is_not_called_unreachable"
+      ],
+      "verification": "Reachable cheaper station 265 miles away is skipped for total detour cost; optimal $151 result unchanged and wording accurate.",
+      "remaining_limitation": "Explanation describes the price/detour decision without attributing a numeric marginal cost to each skipped station.",
+      "confirmed_defect_resolved": true
+    },
+    {
+      "finding": 9,
+      "title": "Malformed JSON and extreme coordinates",
+      "reproduced_before_modification": true,
+      "before": {
+        "9_geocoder": {
+          "exception": "KeyError"
+        },
+        "9_extreme_coordinate": {
+          "status": 500,
+          "body": {
+            "error": {
+              "code": "internal_error",
+              "message": "An unexpected error occurred.",
+              "details": {}
+            }
+          }
+        }
+      },
+      "root_cause": "Unchecked response shape/keys and overflowing float conversion escaped domain validation.",
+      "files_changed": [
+        "route_api/services/nominatim.py",
+        "route_api/services/geo.py",
+        "route_api/services/geocoding_service.py",
+        "route_api/serializers.py",
+        "route_api/services/errors.py"
+      ],
+      "new_regression_tests": [
+        "test_malformed_nominatim_payload_is_controlled_503",
+        "test_extreme_coordinate_inputs_return_controlled_400",
+        "test_cached_foreign_geocode_cannot_bypass_new_boundary_validation",
+        "test_missing_or_corrupt_boundary_data_returns_controlled_503"
+      ],
+      "verification": "Invalid JSON/shapes/metadata return controlled 503; huge/nonfinite/bool/malformed coordinate inputs return 400; no 500.",
+      "remaining_limitation": null,
+      "confirmed_defect_resolved": true
+    },
+    {
+      "finding": 10,
+      "title": "Accurate Loom narration",
+      "reproduced_before_modification": true,
+      "before": {
+        "10_loom": {
+          "blanket_no_geocoding_claim": true,
+          "never_empty_claim": true
+        }
+      },
+      "root_cause": "Script claimed no request-time geocoding and disallowed an empty tank although both were valid behaviors.",
+      "files_changed": [
+        "Loom_Script_Spotter.md",
+        "README.md",
+        "route_api/templates/route_api/app.html"
+      ],
+      "new_regression_tests": [
+        "test_script_explains_geocoding_fallback_and_allows_exactly_zero_fuel"
+      ],
+      "verification": "Tracked script and original external copy corrected: free text can geocode; fuel may reach zero but never be negative. Prices/test counts updated.",
+      "remaining_limitation": "Live provider distances and derived prices can change; refresh demonstration numbers before recording.",
+      "confirmed_defect_resolved": true
+    }
+  ],
+  "unresolved_confirmed_high_priority_defects": [],
+  "verification_artifacts": [
+    "test_suite.json",
+    "route_audit.json",
+    "postman_checks.json",
+    "browser_checks.json",
+    "browser_20mpg_checks.json",
+    "timeout_benchmarks.json",
+    "config_cache_check.json",
+    "additional_api_checks.json",
+    "local_migration.json"
+  ]
+}
