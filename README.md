@@ -15,6 +15,10 @@ Prices come from the supplied OPIS file (`fuel-prices-for-be-assessment.csv`).
 * **Location confidence:** every stop is rated by checking whether the highway in its address is one the route uses near that point.
 * **Self-consistent numbers:** every number in the response can be added up by hand and checks out exactly. This is enforced by a property test.
 
+![New York to Los Angeles fuel plan showing the cost breakdown and numbered fuel stops on the map](route_planner.png)
+
+*Example trip showing the route, recommended fuel stops and estimated fuel cost.*
+
 ## Contents
 1. [Quick start](#quick-start)
 2. [API](#api)
