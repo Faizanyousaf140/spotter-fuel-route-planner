@@ -755,10 +755,10 @@ the collection imported. Have the editor open on `route_api/services/`.
 | Time | Show | Say |
 |---|---|---|
 | 0:00–0:30 | README top | "A Django REST API: start and finish in the USA → route, cheapest fuel stops for a 500-mile, 10-mpg truck, total cost, and a map. One routing call per new route, zero when cached." |
-| 0:30–1:15 | Editor: `planner.py`, then the `services/` folder | "The view validates input and calls the planner. It resolves locations offline from Census data and makes one OSRM call, cached in the database. Stations are matched to the actual route geometry, then the optimiser and cost calculator run. The plan is saved, so its map URL survives restarts." |
+| 0:30–1:15 | Editor: `planner.py`, then the `services/` folder | "The view validates input and calls the planner. City and state inputs resolve offline; free-text inputs can use a cached geocoding fallback. It makes one OSRM call, cached in the database. Stations are matched to the actual route geometry, then the optimiser and cost calculator run. The plan is saved, so its map URL survives restarts." |
 | 1:15–2:30 | Postman: multi-stop New York → Los Angeles; scroll `fuel_stops`, `fuel_cost`, `meta`. Send again. Open `map_url` in a browser. | "Nine stops, each with gallons, cost and the reason it was chosen. Money spent on the trip is kept separate from the estimated value of the starting tank. `meta` shows 1 routing call. On the second send it's 0, a cache hit, and about 0.2 seconds." |
 | 2:30–3:00 | Postman: missing finish (400), Toronto (422), Anchorage → Seattle (422) | "Clear errors with consistent codes. Anchorage to Seattle is impossible because there's no usable station for 2,178 miles, and the API says exactly where the gap is." |
-| 3:00–3:50 | Editor: `fuel_optimizer.py` docstring | "The optimiser is an exact dynamic programme from the gas-station-problem literature. If the next stop is cheaper, buy just enough to reach it; otherwise fill up. That keeps the state space small, and it runs in milliseconds for hundreds of stations." |
+| 3:00–3:50 | Editor: `fuel_optimizer.py` docstring | "The optimiser is an exact dynamic programme from the gas-station-problem literature. If the next stop is cheaper, buy just enough to reach it; otherwise fill up. That keeps the state space small, and it runs in milliseconds for hundreds of stations. The tank may reach exactly zero, but never goes below zero." |
 | 3:50–4:20 | Editor: `test_fuel_optimizer.py` brute-force reference; terminal running `python manage.py test tests` | "It's checked against an independent exhaustive search on 3,500 random cases in the suite and 20,000 in a one-off sweep, with zero mismatches. 175 offline tests cover concurrency, real streaming timeouts, caching and hand-checkable numbers, plus 3 live OSRM tests." |
 | 4:20–4:40 | Map legend; README "Location confidence" | "The price file has no coordinates, so stations sit at city level. Each stop is rated by checking whether its address highway is on the route; 75 % of stops on 30 test routes are high confidence, and you can require that for about 0.2 % extra cost." |
 
@@ -782,7 +782,6 @@ postman/                    Postman collection
 tests/                      178 tests (175 offline, 3 live)
 scripts/                    reproducible boundary build, route/optimizer audit, benchmarks, Newman/browser checks
 validation/                 captured review reproductions and final verification results
-Loom_Script_Spotter.md       corrected recording script (tracked copy)
 fuel-prices-for-be-assessment.csv          original price file (unchanged)
 Spotter_Django_Backend_Assessment.txt      original assignment text
 ```

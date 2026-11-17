@@ -402,7 +402,9 @@ class InputAndGeocoderTests(RouteApiTestCase):
 
 class LoomNarrationTests(SimpleTestCase):
     def test_script_explains_geocoding_fallback_and_allows_exactly_zero_fuel(self):
-        script = (Path(settings.BASE_DIR) / "Loom_Script_Spotter.md").read_text(encoding="utf-8")
+        # The walkthrough now lives in the README, without a separate script file.
+        readme = (Path(settings.BASE_DIR) / "README.md").read_text(encoding="utf-8")
+        script = readme.split("## Demo: Loom walkthrough script", 1)[1].split("## Project layout", 1)[0]
         self.assertNotIn("No geocoding call is made per request.", script)
         self.assertNotIn("never lets the tank go empty", script)
         self.assertIn("free-text inputs can use a cached geocoding fallback", script)
